@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application
+        android:name=".CSApp"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.CSIDEANDROID">
+
+        <!-- Android Share Screen -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.example.csideandroid.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- Start Screen Activity -->
+        <activity
+            android:name=".ui.MainMenuActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Editor Activity -->
+        <activity android:name=".ui.EditorActivityV3"
+            android:windowSoftInputMode="adjustResize"/>
+
+        <activity android:name=".ui.ProjectsBrowserActivity" android:exported="false" />
+        <activity android:name=".ui.FirstRunActivity" android:exported="false" />
+        <activity android:name=".ui.ProjectFilesActivity" android:exported="false" />
+
+        <!-- RunnerActivity launches a WebView that runs the ChoiceScript engine -->
+        <activity
+            android:name=".runner.RunnerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar" />
+
+        <!-- Tutorial Activity launches a WebView that runs the ChoiceScript engine -->
+        <activity
+            android:name=".ui.TutorialActivity"
+            android:exported="false"
+            android:label="@string/title_tutorial" />
+    </application>
+</manifest>

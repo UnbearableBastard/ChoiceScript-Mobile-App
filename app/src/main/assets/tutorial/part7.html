@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ChoiceScript Tutorial – Part 7 (Temp Variables &amp; Random)</title>
+<style>
+body {
+  font-family: sans-serif;
+  padding: 16px;
+  padding-bottom: 80px;
+  line-height: 1.6;
+  background-color: #121212;
+  color: #e0e0e0;
+}
+pre {
+  background: #1e1e1e;
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+h1, h2, h3 { color: #80cbc4; }
+a { color: #82b1ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { font-family: monospace; }
+</style>
+</head>
+<body>
+<h1>Part 7: Temporary Variables &amp; <code>*rand</code></h1>
+
+<h2><code>*create</code> vs <code>*temp</code></h2>
+
+<p>So <code>*create</code> creates permanent variable that last for the whole game and can be modified in any scene file.</p>
+
+<pre>
+*create strength 5
+*create gold 0
+</pre>
+
+<p>But sometimes you'll just want a temporary variable for one scene/chapter. That's where <code>*temp</code> comes in:</p>
+
+<pre>
+*temp roll 0
+*rand roll 1 6
+You rolled a ${roll}.
+</pre>
+
+<p><code>*temp</code> variables exist only in the current scene.</p>
+<p>They are great for one-off calculations.</p>
+
+<h2><code>*rand</code>: random numbers</h2>
+
+<p><code>*rand</code> gives you a random number between two values:</p>
+
+<pre>
+*temp roll 0
+*rand roll 1 6
+You rolled a ${roll}.
+</pre>
+
+<p>You can use this for dice, chance events, or skill checks.</p>
+
+<h2>Simple skill check example</h2>
+
+<pre>
+*create strength 5
+
+*temp roll 0
+*rand roll 1 10
+
+You push against the boulder...
+
+*if (roll + strength) &gt;= 12
+  The boulder rolls aside. You made it!
+*else
+  It does not move. Maybe next time.
+</pre>
+
+<h2>Random events with choices</h2>
+
+<p>You can also randomize what happens after a choice:</p>
+
+<pre>
+*choice
+    # Search the room.
+        *temp find 0
+        *rand find 1 3
+        *if find = 1
+            You find a healing potion.
+            *set potions +1
+        *elseif find = 2
+            You find a few coins.
+            *set gold +5
+        *else
+            You find nothing of interest.
+</pre>
+
+<p>Be cautious about putting <code>*rand</code> on the same page as the <code>*if</code>.</p>
+<p>If the player doesn't get a good roll, they can go into the stats screen and back out to reroll.</p>
+<p>To prevent this, use <code>*rand</code> on the previous page (before the player pressed the "next" button or within a choice like above).</p>
+
+<p><a href="part6.html">&larr; Back to Part 6</a> | <a href="part8.html">Next Part 8: Common Errors &amp; Debugging →</a></p>
+</body>
+</html>

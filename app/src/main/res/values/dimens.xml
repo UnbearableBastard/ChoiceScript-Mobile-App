@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Projects browser -->
+    <dimen name="projects_screen_padding">16dp</dimen>
+    <dimen name="projects_scroll_padding_bottom">32dp</dimen>
+    <dimen name="projects_title_text_size">24sp</dimen>
+    <dimen name="projects_section_top_padding">24dp</dimen>
+    <dimen name="projects_section_bottom_padding">8dp</dimen>
+
+    <!-- Editor -->
+    <dimen name="editor_horizontal_padding">16dp</dimen>
+    <dimen name="editor_vertical_padding">8dp</dimen>
+    <dimen name="editor_text_size">16sp</dimen>
+    <dimen name="editor_bottom_bar_height">64dp</dimen>
+    <dimen name="editor_bottom_bar_horizontal_margin">16dp</dimen>
+
+    <!-- Project files -->
+    <dimen name="project_files_list_padding">12dp</dimen>
+
+    <!-- Cards -->
+    <dimen name="project_card_margin">8dp</dimen>
+    <dimen name="project_file_margin">8dp</dimen>
+
+    <!-- Main menu -->
+    <dimen name="main_menu_padding">24dp</dimen>
+    <dimen name="main_menu_title_text_size">24sp</dimen>
+</resources>

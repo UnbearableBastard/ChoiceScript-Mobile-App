@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Status bar spacer -->
+    <View
+        android:id="@+id/statusBarSpacer"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="#424242"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Top app bar -->
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        android:layout_width="0dp"
+        android:layout_height="?attr/actionBarSize"
+        android:background="#424242"
+        app:layout_constraintTop_toBottomOf="@id/statusBarSpacer"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:titleTextColor="@android:color/white" />
+
+    <!-- Editor container -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/editor_container"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toBottomOf="@id/toolbar"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Scrollable editor -->
+        <androidx.core.widget.NestedScrollView
+            android:id="@+id/editorScroll"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toTopOf="@id/bottomBar"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:fillViewport="true"
+            android:overScrollMode="always"
+            android:smoothScrollbar="true">
+
+            <com.example.csideandroid.ui.LineNumberEditText
+                android:id="@+id/editor"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@android:color/transparent"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp"
+                android:textSize="16sp"
+                android:gravity="top|start"
+                android:inputType="textMultiLine|textNoSuggestions"
+                android:imeOptions="flagNoExtractUi"
+                android:scrollbars="none"
+                android:includeFontPadding="false" />
+        </androidx.core.widget.NestedScrollView>
+
+        <!-- Bottom action bar -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/bottomBar"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            app:cardCornerRadius="16dp"
+            app:cardUseCompatPadding="true"
+            app:cardElevation="3dp"
+            app:cardBackgroundColor="#424242">
+
+            <!-- Single row; each icon gets equal width via layout_weight -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <ImageButton
+                    android:id="@+id/btnUndo"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_marginHorizontal="2dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="10dp"
+                    android:src="@drawable/ic_undo_24"
+                    android:contentDescription="@string/undo"
+                    android:scaleType="centerInside"
+                    android:adjustViewBounds="true"
+                    app:tint="@android:color/white" />
+
+                <ImageButton
+                    android:id="@+id/btnRedo"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_marginHorizontal="2dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="10dp"
+                    android:src="@drawable/ic_redo_24"
+                    android:contentDescription="@string/redo"
+                    android:scaleType="centerInside"
+                    android:adjustViewBounds="true"
+                    app:tint="@android:color/white" />
+
+                <ImageButton
+                    android:id="@+id/btnIndent"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_marginHorizontal="2dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="10dp"
+                    android:src="@drawable/ic_indent_24"
+                    android:contentDescription="@string/indent"
+                    android:scaleType="centerInside"
+                    android:adjustViewBounds="true"
+                    app:tint="@android:color/white" />
+
+                <ImageButton
+                    android:id="@+id/btnOutdent"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_marginHorizontal="2dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="10dp"
+                    android:src="@drawable/ic_outdent_24"
+                    android:contentDescription="@string/outdent"
+                    android:scaleType="centerInside"
+                    android:adjustViewBounds="true"
+                    app:tint="@android:color/white" />
+
+                <ImageButton
+                    android:id="@+id/btnFormat"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_marginHorizontal="2dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="10dp"
+                    android:src="@drawable/ic_format"
+                    android:contentDescription="@string/format"
+                    android:scaleType="centerInside"
+                    android:adjustViewBounds="true"
+                    app:tint="@android:color/white" />
+
+                <!-- Zoom OUT -->
+                <ImageButton
+                    android:id="@+id/btnZoomOut"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_marginHorizontal="2dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="10dp"
+                    android:src="@drawable/zoom_out"
+                    android:contentDescription="@string/zoom_out"
+                    android:scaleType="centerInside"
+                    android:adjustViewBounds="true"
+                    android:scaleX="0.9"
+                    android:scaleY="0.9"
+                    app:tint="@android:color/white" />
+
+                <!-- Zoom IN -->
+                <ImageButton
+                    android:id="@+id/btnZoomIn"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_marginHorizontal="2dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="10dp"
+                    android:src="@drawable/zoom_in"
+                    android:contentDescription="@string/zoom_in"
+                    android:scaleType="centerInside"
+                    android:adjustViewBounds="true"
+                    app:tint="@android:color/white" />
+
+                <ImageButton
+                    android:id="@+id/btnSearch"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_marginHorizontal="2dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="10dp"
+                    android:src="@drawable/ic_search_24"
+                    android:contentDescription="@string/search"
+                    android:scaleType="centerInside"
+                    android:adjustViewBounds="true"
+                    app:tint="@android:color/white" />
+
+                <ImageButton
+                    android:id="@+id/btnSave"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:layout_marginHorizontal="2dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="10dp"
+                    android:src="@drawable/ic_save_24"
+                    android:contentDescription="@string/save"
+                    android:scaleType="centerInside"
+                    android:adjustViewBounds="true"
+                    app:tint="@android:color/white" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

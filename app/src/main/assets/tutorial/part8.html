@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ChoiceScript Tutorial – Part 9 (Common Errors &amp; Debugging)</title>
+<style>
+body {
+  font-family: sans-serif;
+  padding: 16px;
+  padding-bottom: 80px;
+  line-height: 1.6;
+  background-color: #121212;
+  color: #e0e0e0;
+}
+pre {
+  background: #1e1e1e;
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+h1, h2, h3 { color: #80cbc4; }
+a { color: #82b1ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { font-family: monospace; }
+</style>
+</head>
+<body>
+<h1>Part 9: Common Errors &amp; Debugging</h1>
+
+<p>You're going to break your game (probably a lot). Don't worry, that's normal. Here are some of the most common errors and how to fix them.</p>
+
+<h2>&ldquo;Non-existent variable&rdquo;</h2>
+
+<p>This usually means you forgot to <code>*create</code> a variable in <code>startup.txt</code>.</p>
+<p>If you see this error, check for spelling differences and make sure the <code>*create</code> line exists.</p>
+
+<h2>&ldquo;Invalid indent&rdquo; or &ldquo;It is illegal to fall out of a *choice&rdquo;</h2>
+
+<p>These errors often come from indentation problems, mostly from <code>*choice</code>, <code>*fake_choice</code> and <code>#</code> options.</p>
+<p>The <code>#</code> lines are indented under <code>*choice</code>.</p>
+<p>The text after each <code>#</code> is indented one more level.</p>
+<p>The variable <code>*set</code> is on the same indent as the text</p>
+<p>Remember to use two or four indents. Not both.</p>
+
+<p>A extra indent or outdent can confuse the parser.</p>
+
+<h2>&ldquo;No label &lt;name&gt;&rdquo; or &ldquo;Could not find label&rdquo;</h2>
+
+<p>When you use <code>*goto lost_label</code>, there must be a matching <code>*label lost_label</code> in the same scene file.</p>
+<p>If you see this error, check the spelling of the label and the <code>*goto</code>.</p>
+
+<p>There is an error checker included within the editor. Highlight the area and hit run, you'll either get no errors or a message detailing the current errors.</p>
+
+<p><a href="part8.html">&larr; Back to Part 8</a> | <a href="index.html">Back to Part 1</a></p>
+</body>
+</html>

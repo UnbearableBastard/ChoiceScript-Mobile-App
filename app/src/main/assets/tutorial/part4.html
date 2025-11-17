@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ChoiceScript Tutorial – Part 4</title>
+<style>
+body {
+  font-family: sans-serif;
+  padding: 16px;
+  padding-bottom: 80px;
+  line-height: 1.6;
+  background-color: #121212;
+  color: #e0e0e0;
+}
+pre {
+  background: #1e1e1e;
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+h1, h2, h3 { color: #80cbc4; }
+a { color: #82b1ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<h1>Part 4: Stats &amp; Conditions</h1>
+
+<h2>Creating variables</h2>
+<p>In <code>startup.txt</code>, you'll create and name your variables with <code>*create</code>:</p>
+
+<pre>
+*create name "Thomas"
+*create strength 8
+*create gold 230
+</pre>
+
+<ul>
+    <li><code>name</code> is text.</li>
+    <li><code>strength</code> and <code>gold</code> are numbers.</li>
+    <li>You can also leave them blank and set them later. So 'gold 0' or 'name ""'</li>
+</ul>
+
+<h2>Changing variables with <code>*set</code></h2>
+<p>When you want to increase or decrease or change said variable or stat, you'll use <code>*set</code>.</p>
+<pre>
+*set gold +5
+*set strength -1
+*set name "Riley"
+</pre>
+<p>When you use +5, that adds 5 gold, if you use -5, that removes 5 gold, and if you just put a flat number like 5, the gold amount becomes 5. This goes for every stat.</p>
+
+<h2>Using <code>*if</code> and <code>*else</code></h2>
+
+<pre>
+*if strength &gt; 5
+    You easily lift the heavy door.
+*else
+    The door will not budge.
+</pre>
+<p>You can also combine conditions:</p>
+
+<pre>
+*if (strength &gt; 5) and (gold &gt;= 10)
+    You pay the guard and push the door open.
+</pre>
+
+<p>If you want to check for one or the other condition, switch the <code>and</code> with <code>or</code></p>
+<pre>
+*if (strength &gt; 5) or (gold &gt;= 10)
+    You push the door open.
+</pre>
+<h2>Conditional choices</h2>
+
+<p>Sometimes a choice should only appear when a condition is met.</p>
+
+<pre>
+*choice
+    *if (gold &gt;= 5)
+        # Buy a drink.
+            You hand over a few coins.
+    # Leave the tavern.
+        You step back into the night.
+</pre>
+
+<p>The choice to buy a drink only shows up if the player has at least 5 gold. You could also show the choice but make it unselectable if the condition isn't met.</p>
+
+<pre>
+*choice
+    *selectableif (gold &gt;= 5) # Buy a drink.
+        You hand over a few coins.
+    #Leave the tavern.
+        You step back into the night.
+</pre>
+
+<p><a href="part3.html">← Back to Part 3</a> | <a href="part5.html">Next Part 5: The Stats Screen →</a></p>
+</body>
+</html>

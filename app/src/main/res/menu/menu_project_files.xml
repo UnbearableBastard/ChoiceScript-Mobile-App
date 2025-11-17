@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- +New button to create a new file -->
+    <item
+        android:id="@+id/action_new_txt"
+        android:title="+ New"
+        app:showAsAction="always"
+        app:actionLayout="@layout/menu_new_file_button" />
+
+    <!-- Compile game to a playable HTML file -->
+    <item
+        android:id="@+id/action_compile_html"
+        android:title="Compile to HTML"
+        app:showAsAction="never" />
+
+    <!-- Run the game from the app -->
+    <item
+        android:id="@+id/action_run"
+        android:title="Play (Run)"
+        android:icon="@drawable/ic_run_play_24"
+        app:showAsAction="always" />
+</menu>

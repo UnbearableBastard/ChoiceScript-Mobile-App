@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ChoiceScript Tutorial – Part 5 (Stats Screen)</title>
+<style>
+body {
+  font-family: sans-serif;
+  padding: 16px;
+  padding-bottom: 80px;
+  line-height: 1.6;
+  background-color: #121212;
+  color: #e0e0e0;
+}
+pre {
+  background: #1e1e1e;
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+h1, h2, h3 { color: #80cbc4; }
+a { color: #82b1ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { font-family: monospace; }
+</style>
+</head>
+<body>
+<h1>Part 5: The Stats Screen</h1>
+
+<p>Every ChoiceScript game has a stats screen that the players can open at any time.</p>
+
+<p>The stats screen is managed by <code>choicescript_stats.txt</code>. This file is automatically created by the app just like the <code>startup.txt</code> file and cannot be deleted or renamed.</p>
+
+<h2>What goes in choicescript_stats.txt?</h2>
+
+<p>The most common command is <code>*stat_chart</code>.</p>
+
+<pre>
+*stat_chart
+  text name
+  percent strength
+  percent health
+</pre>
+
+<p>When the player opens the stats screen, they might see something like:</p>
+
+
+<p>Name: Peter</p>
+<p>Strength: [██████░░░░] 60%</p>
+<p>Health: [████████░░] 80%</p>
+
+
+<h2>*stat_chart</h2>
+
+<p><code>*stat_chart</code> tells ChoiceScript that you're' about to list some stats to display. Each line under it must be indented at least once.</p>
+
+<p>There are several ways to show a stat:</p>
+
+<h3>1. <code>text</code> stats</h3>
+
+<p>Use <code>text</code> for words, names, or short descriptions.</p>
+
+<pre>
+*stat_chart
+    Name: $!{firstname}
+    Title: $!{title}
+</pre>
+
+<p>This will show the current values of the variables <code>firstname</code> and <code>title</code> when you use <code>${}</code> (for example, &ldquo;Chris&rdquo; and &ldquo;The Gobshite").</p>
+<p>If a sentence starts with the players name or pronouns add a ! after the $ to capitalize the first letter. Like this: <code>$!{}</code>.</p>
+
+<h3>2. <code>percent</code> stats</h3>
+
+<p>Use <code>percent</code> for numbers from 0 to 100. ChoiceScript shows them as a bar plus the number.</p>
+
+<pre>
+*stat_chart
+  percent strength
+  percent health
+  percent gold
+</pre>
+
+<p>Make sure the variables are numeric (for example: <code>*create strength 50</code> in <code>startup.txt</code>).</p>
+
+<h3>3. Opposed pairs</h3>
+
+<p>Opposed pairs are stats that pull in opposite directions, like &ldquo;Kind / Cruel&rdquo; or &ldquo;Lawful / Chaotic&rdquo;.</p>
+
+<p>In your stats screen you can show them like this:</p>
+
+<pre>
+*stat_chart
+  opposed_pair lawful
+    chaotic
+  opposed_pair kind
+    cruel
+</pre>
+
+<h2>Updating stats during the story</h2>
+
+<p>You can change variables inside your scenes using <code>*set</code>. The stats screen will reflect any changes and show their current values.</p>
+
+<p>For example, in <code>startup.txt</code>:</p>
+
+<pre>
+*create name "Liam"
+*create strength 50
+*create lawful 50
+</pre>
+
+<p>During the story:</p>
+
+<pre>
+You help the lost sheep find their way home.
+
+*set kind +10
+*set lawful +5
+</pre>
+
+<p>Then later, when the player checks the stats screen, the bar for kindness and lawfulness will be updated with the new values.</p>
+
+<h2>Showing custom text on the stats screen</h2>
+
+<p>You can also include normal story-style text and conditions in <code>choicescript_stats.txt</code>.</p>
+
+<pre>
+*if strength &gt;= 60
+  You are impressively strong.
+*elseif strength &gt;= 40
+  You are average in strength.
+*else
+  You are weak and pathetic.
+</pre>
+
+<h2>Summary</h2>
+
+<p><code>choicescript_stats.txt</code> controls what the player sees on the stats screen.</p>
+<p><code>*stat_chart</code> shows variables as text, percent bars, or opposed pairs.</p>
+<p>You change stats in your story scenes with <code>*set</code></p>
+<p>You can use <code>*if</code>, <code>*elseif</code>, and <code>*else</code> to show different descriptions based on the player&rsquo;s stats.</p>
+
+<p><a href="part4.html">&larr; Back to Part 4</a> | <a href="part6.html">Next Part 6: Scenes & Scene_list</a></p>
+</body>
+</html>

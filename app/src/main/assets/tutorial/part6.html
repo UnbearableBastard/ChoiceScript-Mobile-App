@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ChoiceScript Tutorial – Part 6 (Scenes &amp; Scene List)</title>
+<style>
+body {
+  font-family: sans-serif;
+  padding: 16px;
+  padding-bottom: 80px;
+  line-height: 1.6;
+  background-color: #121212;
+  color: #e0e0e0;
+}
+pre {
+  background: #1e1e1e;
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+h1, h2, h3 { color: #80cbc4; }
+a { color: #82b1ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { font-family: monospace; }
+</style>
+</head>
+<body>
+<h1>Part 6: Scenes &amp; <code>*scene_list</code></h1>
+
+<p>As your story grows, you'll need to split it up into multiple scene files.</p>
+
+<p>Examples:</p>
+
+<p><code>startup.txt</code> – create the variables & where the game begins.</p>
+<p><code>chapter1.txt</code></p>
+<p><code>chapter2.txt</code></p>
+<p><code>ending.txt</code></p>
+
+<h2><code>*scene_list</code></h2>
+
+<p>In <code>startup.txt</code>, you tell ChoiceScript which scenes exist and in what order:</p>
+
+<pre>
+*title (Your story's name)
+*author (Your name)
+
+*scene_list
+    startup
+    chapter1
+    chapter2
+    ending
+
+*label start
+Welcome to the game!
+*finish
+</pre>
+
+<p>Each line after <code>*scene_list</code> is the name of a <code>.txt</code> file (without the <code>.txt</code>).</p>
+<p>ChoiceScript will look for files like <code>chapter1.txt</code> in your scenes folder. It's case sensitive, so make sure its spelt correctly.</p>
+
+<h2>Moving to the next scene: <code>*finish</code></h2>
+
+<p>At the end of a scene, you can use <code>*finish</code> to jump to the next file in <code>*scene_list</code>:</p>
+
+<pre>
+You scream as you take an arrow to the knee and pass out.
+
+*finish
+</pre>
+
+<p>If you are in <code>startup.txt</code>, <code>*finish</code> will move to <code>chapter1.txt</code>. Its best to have them listed in order.</p>
+
+<h2>Jumping directly to another scene: <code>*goto_scene</code></h2>
+
+<p>If you want to skip to a specific scene, use <code>*goto_scene</code>:</p>
+
+<pre>
+*goto_scene ending
+</pre>
+
+<p>This jumps straight to <code>ending.txt</code>, ignoring the <code>*scene_list</code> order.</p>
+
+<h2>When to make a new scene file</h2>
+
+<p>Some reasons to create a new scene file:</p>
+
+<p>A new chapter.</p>
+<p>A death/endgame scene</p>
+<p>To keep individual files smaller and easier to manage.</p>
+
+<p><a href="part5.html">&larr; Back to Part 5</a> | <a href="part7.html">Next: Temporary Variables &amp; *rand →</a></p>
+</body>
+</html>

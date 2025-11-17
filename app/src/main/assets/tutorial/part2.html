@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ChoiceScript Tutorial – Part 2</title>
+<style>
+body {
+  font-family: sans-serif;
+  padding: 16px;
+  padding-bottom: 80px;
+  line-height: 1.6;
+  background-color: #121212;
+  color: #e0e0e0;
+}
+pre {
+  background: #1e1e1e;
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+h1, h2, h3 { color: #80cbc4; }
+a { color: #82b1ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<h1>Part 2: The Basics &amp; Indentation</h1>
+
+<p>A ChoiceScript story is made of text files. The most important ones are:</p>
+
+<p><code>startup.txt</code> – this is where you create and store your variables, some authors even start the game here.</p>
+<p><code>*create</code> -  this command creates the variable. E.g: health, gold, gender or race.</p>
+<p><code>choicescript_stats.txt</code> – controls the stats screen. Any information you want to player to have access to goes here. Examples are character customization, world-building lore. Anything really.</p>
+<p>Other scene files – Think of these as chapters in a book. They can be called anything you want, however they are case sensitive when it comes to running the game. The file name under <code>scene_list</code> must match the actual file name.</p>
+
+<h2>Indentation (spaces) is important</h2>
+<p>ChoiceScript uses spaces for structure. You can use either 2 spaces or 4 spaces but never both. For example:</p>
+
+<pre>
+*choice
+  #Wave hello.
+    You wave.
+  #Say nothing.
+    You stare at the ground.
+</pre>
+Or:
+<pre>
+*choice
+    #Wave hello.
+        You wave.
+    #Say nothing.
+        You stare at the ground.
+</pre>
+Never this:
+<pre>
+*choice
+    #Wave hello.
+        You wave
+  #Say nothing.
+    You stare at the ground.
+</pre>
+
+<p>Each <code>#</code> option is indented under <code>*choice</code> and the text under <code>#</code> is indented further.</p>
+<p>This editor has increase & decrease indent buttons and uses 4 spaces. If you use this feature, then the rest of your code should be the same for a consistent structure.</p>
+
+<p><a href="index.html">← Back to Part 1</a> | <a href="part3.html">Next: Your First Choice Scene →</a></p>
+
+</body>
+</html>

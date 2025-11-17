@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Themes -->
+    <color name="on_theme_light">#FFFFFF</color>
+    <color name="on_theme_dark">#FFFFFF</color>
+
+</resources>

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ChoiceScript Tutorial – Part 3</title>
+<style>
+body {
+  font-family: sans-serif;
+  padding: 16px;
+  padding-bottom: 80px;
+  line-height: 1.6;
+  background-color: #121212;
+  color: #e0e0e0;
+}
+pre {
+  background: #1e1e1e;
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+h1, h2, h3 { color: #80cbc4; }
+a { color: #82b1ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<h1>Part 3: Which choices to use and when</h1>
+
+<p>Let’s go <code>*choice</code> first.</p>
+
+<pre>
+*label TheCrossroad
+You stand at a crossroad.
+
+*choice
+    # Go left.
+        The path is clear and you see a lake nearby.
+        *goto LeftPath
+    # Go right.
+        The path is clear but there are strange noises and an even stranger smell.
+        *goto RightPath
+
+*label LeftPath
+You walk down the left path and see deer drinking from the lake.
+
+*label RightPath
+You walk down the right path and see vultures eating the carcass of a horse.
+</pre>
+
+<h2>What is <code>*label</code>?</h2>
+
+<p><code>*label</code> marks a position in your scene and is used for branching paths. You don't have to label every scene, only if you want the player to be able to return to a scene later, jump forward to a scene or for branching paths.</p>
+
+<p>When you want to jump to a specific scene, you use:</p>
+
+<pre>
+*goto (Whatever you called the scene) - Spaces are not allowed in the label name, it'll only give you an error. See above, its <code>*label</code> LeftPath and not <code>*label</code> Left Path.
+</pre>
+
+<p>This lets you move around your story.</p>
+
+<h2>Now for <code>*fake_choice</code></h2>
+
+<p><code>*fake_choice</code> is used for flavor text. Use it when you want all choices lead to the same scene. Usually the only difference is a brief reaction or flavour text to make the choice seem meaningful and not pointless.</p>
+
+<pre>
+*label TheCrossroad
+You stand at a crossroad.
+
+*fake_choice
+    #Check the left path.
+        The path is clear and you see a lake nearby but your unsure this is the right way.
+        *goto TurnAround
+    #Check the right path.
+        The path is clear but there's strange noises and an even stranger smell. You hope that's not the path you have to take.
+        *goto TurnAround
+
+*label TurnAround
+You stand there, frozen from your indecisiveness. Unsure which path to take because you lost the map. Truly pathetic.
+</pre>
+
+<p>The above example uses <code>*goto</code> but you can also leave it out since both choices go to the same scene. However <code>*choice</code> must have a *goto at the end of each choice, otherwise you'll get an error.</p>
+
+<h3>When to use <code>*choice</code> vs <code>*fake_choice</code></h3>
+
+<p>So for a quick recap, use <code>*choice</code> when the path truly branches (different scenes, different stats, etc.).</p>
+<p>And use <code>*fake_choice</code> when the options are only for flavor and all lead to the same place/scene.</p>
+
+<p><a href="part2.html">← Back to Part 2</a> | <a href="part4.html">Next Part 4: Stats &amp; Conditions →</a></p>
+</body>
+</html>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+     <!-- Not being used -->
+    <string-array name="theme_names">
+        <item>Red</item>
+        <item>Green</item>
+        <item>Blue</item>
+        <item>Purple</item>
+    </string-array>
+
+    <string-array name="theme_keys">
+        <item>red</item>
+        <item>green</item>
+        <item>blue</item>
+        <item>purple</item>
+    </string-array>
+</resources>
