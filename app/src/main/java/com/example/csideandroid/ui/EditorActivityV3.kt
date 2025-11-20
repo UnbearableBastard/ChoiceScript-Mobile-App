@@ -357,7 +357,62 @@ class EditorActivityV3 : AppCompatActivity() {
         }
     }
 
-    private fun enterSelectionMode() { isSelectionMode = true }
+
+
+    private fun wrapSelectionWithChoiceScriptTag(openTag: String, closeTag: String) {
+        val text = editor.text ?: return
+        val start = editor.selectionStart
+        val end = editor.selectionEnd
+        if (start < 0 || end <= start) return
+
+        val selected = text.subSequence(start, end).toString()
+        val wrapped = buildString {
+            append(openTag)
+            append(selected)
+            append(closeTag)
+        }
+
+        text.replace(start, end, wrapped)
+        editor.setSelection(start + wrapped.length)
+    }
+
+    private fun enterSelectionMode() {
+        isSelectionMode = true
+
+        // Swap toolbar to text actions menu while there is a selection
+        toolbar.menu.clear()
+        toolbar.inflateMenu(R.menu.menu_text_actions)
+
+        toolbar.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                R.id.action_select_all -> {
+                    editor.selectAll()
+                    true
+                }
+                R.id.action_cut -> {
+                    editor.onTextContextMenuItem(android.R.id.cut)
+                    true
+                }
+                R.id.action_copy -> {
+                    editor.onTextContextMenuItem(android.R.id.copy)
+                    true
+                }
+                R.id.action_paste -> {
+                    editor.onTextContextMenuItem(android.R.id.paste)
+                    true
+                }
+                R.id.action_bold -> {
+                    wrapSelectionWithChoiceScriptTag("[b]", "[/b]")
+                    true
+                }
+                R.id.action_italic -> {
+                    wrapSelectionWithChoiceScriptTag("[i]", "[/i]")
+                    true
+                }
+                else -> false
+            }
+        }
+    }
     private fun exitSelectionMode()  { isSelectionMode = false; inflateDefaultMenu() }
 
     // ---- ChoiceScript error checking (selection only) ----

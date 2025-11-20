@@ -3,6 +3,7 @@ package com.example.csideandroid.runner
 import android.annotation.SuppressLint
 import android.os.Bundle
 import android.util.Log
+import android.webkit.ConsoleMessage
 import android.webkit.MimeTypeMap
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -17,7 +18,10 @@ import com.example.csideandroid.R
 import java.io.File
 import java.io.FileInputStream
 
-// Code for running the game through the app with a local WebView
+/**
+ * Runs the local ChoiceScript game in a WebView.
+ * Uses WebView.saveState / restoreState so rotation does NOT reset the game.
+ */
 class RunnerActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
@@ -29,14 +33,18 @@ class RunnerActivity : AppCompatActivity() {
 
         webView = findViewById(R.id.webView)
 
+        // WebView settings for the engine
         val settings = webView.settings
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
         settings.allowFileAccess = false
         settings.allowContentAccess = true
+        settings.builtInZoomControls = false
+        settings.displayZoomControls = false
         settings.cacheMode = WebSettings.LOAD_DEFAULT
         settings.mediaPlaybackRequiresUserGesture = false
 
+        // Serve assets from /android_asset/ over https
         val assetLoader = WebViewAssetLoader.Builder()
             .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
             .build()
@@ -47,40 +55,71 @@ class RunnerActivity : AppCompatActivity() {
                 request: WebResourceRequest
             ): WebResourceResponse? {
                 val url = request.url.toString()
-                // If engine asks for /assets/choicescript/web/mygame/... serve from internal /files/runner/mygame/...
-                val prefix = "https://appassets.androidplatform.net/assets/choicescript/web/mygame/"
+
+                // First, try the compiled game files in filesDir/runner/mygame
+                val prefix =
+                    "https://appassets.androidplatform.net/assets/choicescript/web/mygame/"
                 if (url.startsWith(prefix)) {
                     val relative = url.removePrefix(prefix)
                     val fileOnDisk = File(filesDir, "runner/mygame/$relative")
                     if (fileOnDisk.exists()) {
                         val mime = guessMime(fileOnDisk.name)
-                        return WebResourceResponse(mime, "utf-8", FileInputStream(fileOnDisk))
+                        return WebResourceResponse(
+                            mime,
+                            "utf-8",
+                            FileInputStream(fileOnDisk)
+                        )
                     }
                 }
+
+                // Otherwise, fall back to the normal asset loader
                 return assetLoader.shouldInterceptRequest(request.url)
             }
         }
 
         webView.webChromeClient = object : WebChromeClient() {
-            override fun onConsoleMessage(message: android.webkit.ConsoleMessage): Boolean {
-                Log.d("RunnerActivity", "[${'$'}{message.messageLevel()}] ${'$'}{message.message()} @${'$'}{message.sourceId()}:${'$'}{message.lineNumber()}")
+            override fun onConsoleMessage(message: ConsoleMessage): Boolean {
+                Log.d(
+                    "RunnerActivity",
+                    "[${message.message()} @${message.sourceId()}:${message.lineNumber()}]"
+                )
                 return super.onConsoleMessage(message)
             }
         }
 
-        // Load engine index. It will request mygame/*, which we override above.
-        webView.loadUrl("https://appassets.androidplatform.net/assets/choicescript/web/index.html")
-
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                if (webView.canGoBack()) webView.goBack() else {
-                    isEnabled = false
-                    onBackPressedDispatcher.onBackPressed()
+        // System back: go back in WebView history first, then finish
+        onBackPressedDispatcher.addCallback(
+            this,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    if (this@RunnerActivity::webView.isInitialized && webView.canGoBack()) {
+                        webView.goBack()
+                    } else {
+                        isEnabled = false
+                        onBackPressedDispatcher.onBackPressed()
+                    }
                 }
             }
-        })
+        )
+
+        if (savedInstanceState != null) {
+            // Restore current page + history after rotation
+            webView.restoreState(savedInstanceState)
+        } else {
+            // First launch
+            webView.loadUrl(
+                "https://appassets.androidplatform.net/assets/choicescript/web/mygame/index.html"
+            )
+        }
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        // Save WebView state so it survives configuration changes
+        webView.saveState(outState)
+        super.onSaveInstanceState(outState)
+    }
+
+    // Simple MIME type guesser for our local files.
     private fun guessMime(name: String): String {
         val ext = name.substringAfterLast('.', "").lowercase()
         return when (ext) {
@@ -91,15 +130,20 @@ class RunnerActivity : AppCompatActivity() {
             "css" -> "text/css"
             "png" -> "image/png"
             "jpg", "jpeg" -> "image/jpeg"
-            else -> MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: "application/octet-stream"
+            else -> MimeTypeMap.getSingleton()
+                .getMimeTypeFromExtension(ext)
+                ?: "application/octet-stream"
         }
     }
 
     override fun onDestroy() {
         try {
-            webView.removeAllViews()
-            webView.destroy()
-        } catch (_: Exception) { }
+            if (this::webView.isInitialized) {
+                webView.removeAllViews()
+                webView.destroy()
+            }
+        } catch (_: Exception) {
+        }
         super.onDestroy()
     }
 }

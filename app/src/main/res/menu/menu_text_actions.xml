@@ -23,4 +23,16 @@
         android:icon="@drawable/paste"
         android:title="@string/paste"
         app:showAsAction="always" />
+
+    <item
+        android:id="@+id/action_bold"
+        android:icon="@drawable/bold"
+        android:title="@string/bold"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/action_italic"
+        android:icon="@drawable/italic"
+        android:title="@string/italic"
+        app:showAsAction="always" />
 </menu>

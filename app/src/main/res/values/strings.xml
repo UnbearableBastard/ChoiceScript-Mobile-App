@@ -10,6 +10,7 @@
     <string name="title_projects">Projects</string>
     <string name="no_projects_hint">No projects found. Create one first.</string>
     <string name="no_file_open">No file open</string>
+    <string name="project_menu">Project options</string>
     <string name="pin">Pin</string>
     <string name="title_new_project">New project</string>
     <string name="create">Create</string>
@@ -51,6 +52,8 @@
 
     <!-- Text Selection Action Labels -->
     <string name="select_all">Select all</string>
+    <string name="bold">Bold</string>
+    <string name="italic">Italic</string>
     <string name="cut">Cut</string>
     <string name="copy">Copy</string>
     <string name="paste">Paste</string>

@@ -46,7 +46,8 @@
         <activity
             android:name=".runner.RunnerActivity"
             android:exported="false"
-            android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar" />
+            android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize|uiMode" />
 
         <!-- Tutorial Activity launches a WebView that runs the ChoiceScript engine -->
         <activity

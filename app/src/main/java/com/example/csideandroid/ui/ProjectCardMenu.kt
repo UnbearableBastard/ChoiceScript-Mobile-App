@@ -9,7 +9,7 @@ import com.example.csideandroid.R
 import com.google.android.material.textfield.TextInputEditText
 import java.io.File
 
-// Long-press popup for project cards with Rename/Delete.
+// Popup for project cards with Rename/Delete.
 object ProjectCardMenu {
 
     fun attach(

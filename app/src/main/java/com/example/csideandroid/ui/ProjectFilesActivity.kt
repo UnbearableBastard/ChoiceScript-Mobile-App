@@ -19,6 +19,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updateLayoutParams
 import androidx.documentfile.provider.DocumentFile
+import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.csideandroid.R
@@ -40,6 +41,10 @@ class ProjectFilesActivity : AppCompatActivity() {
     private var projectTree: DocumentFile? = null
     private var scenesDir: DocumentFile? = null
     private var cache: List<DocumentFile> = emptyList()
+
+    // Cache for file metadata (size + words) so we don't recompute on every bind
+    private val fileMetaCache = mutableMapOf<String, Pair<String, String>>()
+    private val fileMetaInProgress = java.util.Collections.synchronizedSet(mutableSetOf<String>())
 
     private fun promptCompileToSingleHtml() {
         val project = projectTree
@@ -115,6 +120,25 @@ class ProjectFilesActivity : AppCompatActivity() {
         }
 
         recycler = findViewById(R.id.recyclerFiles)
+
+        // Ensure the last file card is not hidden behind the system navigation bar.
+        // Keep whatever padding is defined in XML and add the bottom nav-bar inset.
+        val initialLeft = recycler.paddingLeft
+        val initialTop = recycler.paddingTop
+        val initialRight = recycler.paddingRight
+        val initialBottom = recycler.paddingBottom
+
+        ViewCompat.setOnApplyWindowInsetsListener(recycler) { v, insets ->
+            val navInsets = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
+            v.setPadding(
+                initialLeft,
+                initialTop,
+                initialRight,
+                initialBottom + navInsets.bottom
+            )
+            insets
+        }
+
         recycler.layoutManager = LinearLayoutManager(this)
 
         val uriStr = intent.getStringExtra("extra_project_uri") ?: run { finish(); return }
@@ -133,6 +157,41 @@ class ProjectFilesActivity : AppCompatActivity() {
         )
         recycler.adapter = adapter
         loadFiles()
+
+        // Enable drag-and-drop reordering of file cards via long-press-and-drag.
+        val touchHelper = ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(
+            ItemTouchHelper.UP or ItemTouchHelper.DOWN,
+            0
+        ) {
+            override fun onMove(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder,
+                target: RecyclerView.ViewHolder
+            ): Boolean {
+                val from = viewHolder.bindingAdapterPosition
+                val to = target.bindingAdapterPosition
+                if (from == RecyclerView.NO_POSITION || to == RecyclerView.NO_POSITION) return false
+
+                val current = adapter.currentList.toMutableList()
+                if (from !in current.indices || to !in current.indices) return false
+
+                val item = current.removeAt(from)
+                current.add(to, item)
+                adapter.submit(current)
+
+                return true
+            }
+
+            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
+                // no-op; no swipe actions in this screen
+            }
+
+            override fun isLongPressDragEnabled(): Boolean {
+                // Use built-in long-press (about ~0.5–1s) to start drag
+                return true
+            }
+        })
+        touchHelper.attachToRecyclerView(recycler)
     }
 
     private fun resolveScenes(project: DocumentFile): DocumentFile {
@@ -148,19 +207,25 @@ class ProjectFilesActivity : AppCompatActivity() {
     }
 
     //
-     // meta1 = first line under filename
-     // meta2 = second line under filename
+    // meta1 = first line under filename
+    // meta2 = second line under filename
+    //
+    // For .txt files:
+    //   meta1: "<size> – <words> words"
+    //   meta2: "<last modified relative>"
+    //
+    // For non-txt:
+    //   meta1: "<size>"
+    //   meta2: "<last modified relative>"
 
-     // For .txt files:
-     //   meta1: "<size> – <words> words"
-     //   meta2: "<last modified relative>"
+    private fun metaFor(fake: File): Pair<String, String> {
+        val name = fake.name ?: return "—" to "—"
 
-     //  For non-txt:
-     //   meta1: "<size>"
-     //   meta2: "<last modified relative>"
+        // 1) If we already have cached metadata, return it immediately
+        fileMetaCache[name]?.let { return it }
 
-    private fun metaFor(fake: File): Pair<String,String> {
-        val df = cache.firstOrNull { it.name == fake.name } ?: return "—" to "—"
+        // 2) Map to DocumentFile
+        val df = cache.firstOrNull { it.name == name } ?: return "—" to "—"
 
         val sizeStr = Formatter.formatShortFileSize(this, df.length())
         val lm = df.lastModified()
@@ -174,14 +239,43 @@ class ProjectFilesActivity : AppCompatActivity() {
             else
                 "—"
 
-        return if (df.name?.endsWith(".txt", ignoreCase = true) == true) {
-            val words = WordCountUtil.countWordsInFile(df, contentResolver)
-            val nf = NumberFormat.getIntegerInstance()
-            val wordsStr = nf.format(words)
-            "$sizeStr – $wordsStr words" to whenStr
-        } else {
-            sizeStr to whenStr
+        // 3) Base meta: cheap info only (size + "calculating…" if .txt)
+        val baseMeta: Pair<String, String> =
+            if (df.name?.endsWith(".txt", ignoreCase = true) == true) {
+                "$sizeStr – calculating words…" to whenStr
+            } else {
+                sizeStr to whenStr
+            }
+
+        // Cache the cheap result so next bind is instant
+        fileMetaCache[name] = baseMeta
+
+        // 4) Kick off background word-count for .txt files (once per file)
+        if (df.name?.endsWith(".txt", ignoreCase = true) == true &&
+            !fileMetaInProgress.contains(name)
+        ) {
+            fileMetaInProgress.add(name)
+            Thread {
+                try {
+                    val words = WordCountUtil.countWordsInFile(df, contentResolver)
+                    val nf = NumberFormat.getIntegerInstance()
+                    val wordsStr = nf.format(words)
+                    val finalMeta = "$sizeStr – $wordsStr words" to whenStr
+
+                    // Update cache then refresh list on UI thread
+                    fileMetaCache[name] = finalMeta
+                    runOnUiThread {
+                        adapter.notifyDataSetChanged()
+                    }
+                } catch (_: Exception) {
+                    // ignore errors, keep baseMeta
+                } finally {
+                    fileMetaInProgress.remove(name)
+                }
+            }.start()
         }
+
+        return baseMeta
     }
 
     private fun promptNewFile() {

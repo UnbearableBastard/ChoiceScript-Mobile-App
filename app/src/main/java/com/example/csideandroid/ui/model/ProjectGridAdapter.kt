@@ -19,6 +19,7 @@ class ProjectGridAdapter(
     private val metaProvider: (File) -> Pair<String, String>,
     private val onOpen: (File) -> Unit,
     private val onTogglePin: (File) -> Unit,
+    // This callback is now specifically for the 3-dot menu button
     private val onLongPress: (File, View) -> Unit
 ) : RecyclerView.Adapter<ProjectGridAdapter.CardVH>() {
 
@@ -50,6 +51,7 @@ class ProjectGridAdapter(
         private val meta2: TextView = v.findViewById(R.id.txtCardMeta2)
         private val path: TextView = v.findViewById(R.id.txtCardPath)
         private val pin: ImageButton = v.findViewById(R.id.btnPin)
+        private val menu: ImageButton = v.findViewById(R.id.btnMore)
 
         fun bind(
             dir: File,
@@ -85,11 +87,18 @@ class ProjectGridAdapter(
             val pinned = isPinned(dir)
             applyPinState(pinned)
 
+            // Tap card = open project
             itemView.setOnClickListener { onOpen(dir) }
-            itemView.setOnLongClickListener { onLongPress(dir, itemView); true }
+
+            // Tap star = toggle pin
             pin.setOnClickListener {
                 onToggle(dir)
                 applyPinState(isPinned(dir))
+            }
+
+            // Tap 3-dot = show popup menu (Rename / Delete / Upload...)
+            menu.setOnClickListener { v ->
+                onLongPress(dir, v)
             }
         }
     }

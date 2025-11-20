@@ -82,6 +82,7 @@
                 android:paddingTop="6dp"/>
         </LinearLayout>
 
+        <!-- Star (pin) button -->
         <ImageButton
             android:id="@+id/btnPin"
             style="?attr/borderlessButtonStyle"
@@ -91,9 +92,22 @@
             android:padding="8dp"
             android:contentDescription="@string/pin"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:focusable="false"
-            android:clickable="false"
-            app:srcCompat="@android:drawable/btn_star_big_off"
+            android:focusable="true"
+            android:clickable="true"
+            app:srcCompat="@drawable/ic_star_outline"
             app:tint="@null" />
+
+        <!-- 3-dot overflow menu button (NO custom xml needed) -->
+        <ImageButton
+            android:id="@+id/btnMore"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@null"
+            android:padding="4dp"
+            android:focusable="false"
+            android:clickable="true"
+            android:src="@drawable/abc_ic_menu_overflow_material" />
+
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

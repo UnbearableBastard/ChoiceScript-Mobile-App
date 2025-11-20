@@ -11,7 +11,7 @@ body {
   background-color: #F7F4F1;
   color: rgba(0, 0, 0, 0.85);
   margin: 1ch auto;
-  padding: 0;
+  padding: 0 0 6rem 0; /* extra space at the bottom */
   -webkit-user-select: text; /* selectable text for Chrome app support */
   transition-property: background-color, color;
   transition-duration: 2s;
@@ -276,9 +276,9 @@ button {
     font-size:1.5em;
     font-weight:bolder;
     font-family: -apple-system, sans-serif; /* reset, for Android */
-    margin: 1rem 0; /* reset button margin */
+    margin: 1rem 0 5rem 0; /* extra space under the Next button */
     -webkit-appearance: none; /* Safari, don't override my CSS styles */
-    color: #f7f4f1; /* Match background color */ 
+    color: #f7f4f1; /* Match background color */
     background-color: #626160;
     border: none;
     -webkit-border-radius: 0.5em;
@@ -505,7 +505,7 @@ dialog:not([open]) {
   .definition{
     display: none;
   }
-  
+
   #headerLinks {
     display: none;
   }
@@ -525,11 +525,11 @@ dialog:not([open]) {
   #advertisement {
     margin: -8px;
   }
-  
+
   .mobileBadges {
     float: none;
   }
-  
+
   #header {
     margin-top: 30px;
   }
@@ -538,7 +538,7 @@ dialog:not([open]) {
   #text .alignleft, #text .alignright {
     max-width: 45%;
   }
-  
+
   #identity {
     display: none;
   }

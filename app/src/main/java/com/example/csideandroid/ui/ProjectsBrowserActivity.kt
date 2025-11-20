@@ -3,7 +3,9 @@ package com.example.csideandroid.ui
 import android.content.Intent
 import android.os.Bundle
 import android.text.format.DateUtils
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -11,6 +13,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import androidx.documentfile.provider.DocumentFile
 import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
 import com.example.csideandroid.R
 import com.example.csideandroid.storage.StorageAccess
@@ -19,8 +22,11 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStreamWriter
 import java.text.NumberFormat
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import kotlin.math.abs
 
 class ProjectsBrowserActivity : AppCompatActivity() {
 
@@ -50,6 +56,23 @@ class ProjectsBrowserActivity : AppCompatActivity() {
     private lateinit var pinnedAdapter: ProjectGridAdapter
     private lateinit var recentAdapter: ProjectGridAdapter
     private lateinit var allAdapter: ProjectGridAdapter
+
+    // Drag helpers for each section
+    private lateinit var pinnedTouchHelper: ItemTouchHelper
+    private lateinit var recentTouchHelper: ItemTouchHelper
+    private lateinit var allTouchHelper: ItemTouchHelper
+
+    // Cache for project metadata (scenes + words) so we avoid heavy recomputation
+    private val projectMetaCache = mutableMapOf<String, Pair<String, String>>()
+    private val projectMetaInProgress = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
+    // Single background executor for project metadata / word counts
+    private val projectMetaExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+
+    // Current lists so background updates can safely rebind
+    private var currentPinned: List<File> = emptyList()
+    private var currentRecent: List<File> = emptyList()
+    private var currentAll: List<File> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -103,6 +126,9 @@ class ProjectsBrowserActivity : AppCompatActivity() {
         recentGrid.adapter = recentAdapter
         allGrid.adapter    = allAdapter
 
+        // Enable drag-to-reorder for all three sections without breaking long-press popup
+        setupDragAndDrop()
+
         findViewById<View>(R.id.btnTutorial)?.setOnClickListener {
             startActivity(Intent(this, TutorialActivity::class.java))
         }
@@ -110,6 +136,12 @@ class ProjectsBrowserActivity : AppCompatActivity() {
         findViewById<View>(R.id.btnNewProject)?.setOnClickListener { promptNewProject() }
 
         reload()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Cleanly stop background metadata work when this Activity is going away.
+        projectMetaExecutor.shutdownNow()
     }
 
     // Create a ZIP file for the entire project directory
@@ -153,34 +185,23 @@ class ProjectsBrowserActivity : AppCompatActivity() {
     }
 
     private fun metaForProject(name: String): Pair<String, String> {
+        // 1) cached? return immediately
+        projectMetaCache[name]?.let { return it }
+
         val root = StorageAccess.getProjectsRoot(this) ?: return "—" to "—"
         val proj = root.findFile(name) ?: return "—" to "—"
 
         val scenesDir = proj.findFile("scenes")
             ?: proj.findFile("mygame")?.findFile("scenes")
 
+        // 2) cheap scene count (shallow scan only)
         var scenes = 0
-        var assets = 0
-
-        fun scan(dir: DocumentFile?) {
-            dir?.listFiles()?.forEach {
-                if (it.isDirectory) scan(it)
-                else {
-                    val n = it.name?.lowercase() ?: ""
-                    if (n.endsWith(".txt")) scenes++
-                    else assets++
-                }
+        scenesDir?.listFiles()?.forEach {
+            if (it.isFile) {
+                val n = it.name?.lowercase() ?: ""
+                if (n.endsWith(".txt")) scenes++
             }
         }
-        scan(scenesDir)
-
-        // Total wordcount across all .txt in the project (ignoring * lines)
-        val totalWords = WordCountUtil.countWordsInProject(proj, contentResolver)
-        val nf = NumberFormat.getIntegerInstance()
-        val wordsStr = nf.format(totalWords)
-
-        // SHORTER: remove assets so it doesn’t get cut off
-        val top = "$scenes scenes — $wordsStr words"
 
         val t = getLastOpenedProject(name)
         val bottom =
@@ -189,7 +210,40 @@ class ProjectsBrowserActivity : AppCompatActivity() {
             )
             else "Never opened"
 
-        return top to bottom
+        val nf = NumberFormat.getIntegerInstance()
+        val placeholderTop = "$scenes scenes — calculating words…"
+        val baseMeta = placeholderTop to bottom
+
+        // cache placeholder so binds are instant
+        projectMetaCache[name] = baseMeta
+
+        // 3) background word-count across project (once per project),
+        //    using a single executor instead of spawning many threads.
+        if (!projectMetaInProgress.contains(name)) {
+            projectMetaInProgress.add(name)
+            projectMetaExecutor.execute {
+                try {
+                    val totalWords = WordCountUtil.countWordsInProject(proj, contentResolver)
+                    val wordsStr = nf.format(totalWords)
+                    val finalTop = "$scenes scenes — $wordsStr words"
+                    val finalMeta = finalTop to bottom
+                    projectMetaCache[name] = finalMeta
+
+                    // rebind adapters on UI thread with same lists but updated meta
+                    runOnUiThread {
+                        pinnedAdapter.update(currentPinned)
+                        recentAdapter.update(currentRecent)
+                        allAdapter.update(currentAll)
+                    }
+                } catch (_: Exception) {
+                    // ignore, keep placeholder
+                } finally {
+                    projectMetaInProgress.remove(name)
+                }
+            }
+        }
+
+        return baseMeta
     }
 
     private fun reload() {
@@ -210,6 +264,11 @@ class ProjectsBrowserActivity : AppCompatActivity() {
         val recent = all.filter { getLastOpenedProject(it.name) > 0 }
             .sortedByDescending { getLastOpenedProject(it.name) }
             .take(10)
+
+        // store current lists so background meta updates can rebind safely
+        currentAll = all
+        currentPinned = pinned
+        currentRecent = recent
 
         pinnedAdapter.update(pinned)
         recentAdapter.update(recent)
@@ -288,7 +347,8 @@ class ProjectsBrowserActivity : AppCompatActivity() {
                                     android.provider.DocumentsContract.renameDocument(
                                         contentResolver, df.uri, nn
                                     )
-                                } catch (_: Exception) {}
+                                } catch (_: Exception) {
+                                }
                                 reload()
                             }
                         }.show()
@@ -365,5 +425,109 @@ class ProjectsBrowserActivity : AppCompatActivity() {
             Intent(this, ProjectFilesActivity::class.java)
                 .putExtra("extra_project_uri", df.uri.toString())
         )
+    }
+
+    // Set up drag-and-drop reordering for pinned, recent, and all project grids.
+    // Drag starts when the user presses and moves, so long-press is still free for the popup menu.
+
+    private fun setupDragAndDrop() {
+
+        // ---- PINNED SECTION ----
+        val pinnedCallback = object : ItemTouchHelper.SimpleCallback(
+            ItemTouchHelper.UP or ItemTouchHelper.DOWN or
+                    ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT,
+            0
+        ) {
+            override fun isLongPressDragEnabled(): Boolean = true
+
+            override fun onMove(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder,
+                target: RecyclerView.ViewHolder
+            ): Boolean {
+                val from = viewHolder.bindingAdapterPosition
+                val to = target.bindingAdapterPosition
+                if (from !in currentPinned.indices || to !in currentPinned.indices) return false
+
+                val list = currentPinned.toMutableList()
+                val item = list.removeAt(from)
+                list.add(to, item)
+
+                currentPinned = list
+                pinnedAdapter.update(list)
+                return true
+            }
+
+            override fun onSwiped(vh: RecyclerView.ViewHolder, dir: Int) { }
+        }
+
+        pinnedTouchHelper = ItemTouchHelper(pinnedCallback)
+        pinnedTouchHelper.attachToRecyclerView(pinnedGrid)
+
+
+        // ---- RECENT SECTION ----
+        val recentCallback = object : ItemTouchHelper.SimpleCallback(
+            ItemTouchHelper.UP or ItemTouchHelper.DOWN or
+                    ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT,
+            0
+        ) {
+            override fun isLongPressDragEnabled(): Boolean = true
+
+            override fun onMove(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder,
+                target: RecyclerView.ViewHolder
+            ): Boolean {
+                val from = viewHolder.bindingAdapterPosition
+                val to = target.bindingAdapterPosition
+                if (from !in currentRecent.indices || to !in currentRecent.indices) return false
+
+                val list = currentRecent.toMutableList()
+                val item = list.removeAt(from)
+                list.add(to, item)
+
+                currentRecent = list
+                recentAdapter.update(list)
+                return true
+            }
+
+            override fun onSwiped(vh: RecyclerView.ViewHolder, dir: Int) { }
+        }
+
+        recentTouchHelper = ItemTouchHelper(recentCallback)
+        recentTouchHelper.attachToRecyclerView(recentGrid)
+
+
+        // ---- ALL SECTION ----
+        val allCallback = object : ItemTouchHelper.SimpleCallback(
+            ItemTouchHelper.UP or ItemTouchHelper.DOWN or
+                    ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT,
+            0
+        ) {
+            override fun isLongPressDragEnabled(): Boolean = true
+
+            override fun onMove(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder,
+                target: RecyclerView.ViewHolder
+            ): Boolean {
+                val from = viewHolder.bindingAdapterPosition
+                val to = target.bindingAdapterPosition
+                if (from !in currentAll.indices || to !in currentAll.indices) return false
+
+                val list = currentAll.toMutableList()
+                val item = list.removeAt(from)
+                list.add(to, item)
+
+                currentAll = list
+                allAdapter.update(list)
+                return true
+            }
+
+            override fun onSwiped(vh: RecyclerView.ViewHolder, dir: Int) { }
+        }
+
+        allTouchHelper = ItemTouchHelper(allCallback)
+        allTouchHelper.attachToRecyclerView(allGrid)
     }
 }
