@@ -4,7 +4,6 @@ import android.graphics.Color
 import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
-import android.os.Handler
 import android.os.Looper
 import android.text.Editable
 import android.text.Spannable
@@ -15,6 +14,8 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.ViewTreeObserver
 import android.view.WindowManager
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.ArrayAdapter
 import android.widget.ImageButton
 import android.widget.Toast
@@ -26,12 +27,10 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.documentfile.provider.DocumentFile
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import org.json.JSONObject
-import org.json.JSONArray
 import com.example.csideandroid.R
 import com.google.android.material.appbar.MaterialToolbar
+import kotlinx.coroutines.*
+import org.json.JSONObject
 import java.io.OutputStreamWriter
 import kotlin.math.max
 
@@ -56,11 +55,18 @@ class EditorActivityV3 : AppCompatActivity() {
     private val reOption      = Regex("(?m)^\\s*#.*$")
     private val reInlineVar   = Regex("\\$!?\\{[^}\\n]*\\}")
 
-    private val hiHandler = Handler(Looper.getMainLooper())
-    private val hiRunnable = Runnable { rehighlightVisible() }
-    private var hiScheduled = false
+    // --- Coroutine Debouncing State ---
+    private val mainScope = CoroutineScope(Dispatchers.Main.immediate)
+    private var autocompleteJob: Job? = null
+    private var highlightJob: Job? = null
+
     private var caretRecenterRequested = false
 
+    // NEW: Variable to store raw cursor position immediately on text change
+    private var lastCursorPosition: Int = 0
+
+    private val HIGHLIGHT_DELAY_MS = 300L
+    private val AUTOCOMPLETE_DELAY_MS = 250L
 
     // UI
     private lateinit var editor: LineNumberEditText
@@ -90,6 +96,7 @@ class EditorActivityV3 : AppCompatActivity() {
 
     private lateinit var validationWebView: WebView
     private var validationReady: Boolean = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -99,9 +106,6 @@ class EditorActivityV3 : AppCompatActivity() {
         toolbar = findViewById(R.id.toolbar)
         editor = findViewById(R.id.editor)
         currentTextSizeSp = editor.textSize / resources.displayMetrics.scaledDensity
-
-
-
 
         // load and apply current theme
         val currentTheme = EditorThemeManager.getCurrentTheme(this)
@@ -206,10 +210,17 @@ class EditorActivityV3 : AppCompatActivity() {
         editor.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+
+            // MINIMAL WORK HERE TO AVOID BLOCKING THE UI THREAD
             override fun afterTextChanged(s: Editable) {
                 caretRecenterRequested = true
+
+                // Store cursor position immediately. This is cheap.
+                lastCursorPosition = editor.selectionStart
+
+                // Schedule both expensive jobs. They will do the layout/string calculations later.
                 scheduleHighlight()
-                maybeShowAutoComplete()
+                scheduleAutoComplete()
             }
         })
 
@@ -226,9 +237,7 @@ class EditorActivityV3 : AppCompatActivity() {
             false
         }
 
-        editor.post { scheduleHighlight() }
-
-
+        editor.post { scheduleHighlight() } // Initial highlight
 
         initValidationWebView()
 
@@ -236,9 +245,29 @@ class EditorActivityV3 : AppCompatActivity() {
         setupKeyboardCentering(root)
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        mainScope.cancel()
+    }
+
+    // ----------------------------------------------------------------
+    // UPDATED: scheduleAutoComplete() no longer takes a 'line' parameter
+    // ----------------------------------------------------------------
+    private fun scheduleAutoComplete() {
+        autocompleteJob?.cancel()
+
+        autocompleteJob = mainScope.launch {
+            delay(AUTOCOMPLETE_DELAY_MS)
+            // Perform the heavy check and show logic inside the debounced job
+            maybeShowAutoComplete()
+        }
+    }
+
     override fun onPause() {
         super.onPause()
-        saveDocument(showToast = true)  // change to false to autosave silently
+        highlightJob?.cancel()
+        autocompleteJob?.cancel()
+        saveDocument(showToast = true)
     }
 
     // ---- theme ----
@@ -530,11 +559,6 @@ class EditorActivityV3 : AppCompatActivity() {
         }
     }
 
-
-
-
-
-    // ---- save / search / highlight ----
     private fun promptSearch() {
         val input = android.widget.EditText(this).apply {
             hint = getString(R.string.find); setSingleLine(true)
@@ -581,9 +605,12 @@ class EditorActivityV3 : AppCompatActivity() {
     }
 
     private fun scheduleHighlight() {
-        if (hiScheduled) hiHandler.removeCallbacks(hiRunnable)
-        hiScheduled = true
-        hiHandler.postDelayed({ hiScheduled = false; rehighlightVisible() }, 40)
+        highlightJob?.cancel()
+
+        highlightJob = mainScope.launch {
+            delay(HIGHLIGHT_DELAY_MS)
+            rehighlight()
+        }
     }
 
     private fun visibleCharRange(): IntRange {
@@ -597,69 +624,95 @@ class EditorActivityV3 : AppCompatActivity() {
     }
 
     private inner class CSSpan(color: Int) : ForegroundColorSpan(color)
+
     private fun clearOurSpans(text: Spannable, range: IntRange) {
-        text.getSpans(range.first, range.last, CSSpan::class.java).forEach { text.removeSpan(it) }
+        val start = range.first
+        val endExclusive = range.last + 1
+        text.getSpans(start, endExclusive, CSSpan::class.java).forEach { span ->
+            text.removeSpan(span)
+        }
     }
 
-    private fun rehighlightVisible() {
+    // ----------------------------------------------------------------
+    // Syntax highlighting for ChoiceScript commands / options / vars
+    // ----------------------------------------------------------------
+    private fun rehighlight() {
         val editable = editor.text as? Spannable ?: return
-        val range = visibleCharRange()
-        clearOurSpans(editable, range)
-        val slice = editable.subSequence(range.first, range.last)
+
+        val length = editable.length
+        if (length == 0) return
+
+        // For correctness, highlight the whole document.
+        val startOffset = 0
+        val endOffset = length
+        val targetRange = startOffset until endOffset
+
+        // Remove our existing spans in this range
+        clearOurSpans(editable, targetRange)
+
+        val slice: CharSequence = editable.subSequence(startOffset, endOffset)
 
         val optionColor = themeColors.optionColor
         val inlineVarColor = themeColors.inlineVarColor
         val defaultCommandColor = themeColors.defaultCommandColor
         val commandColors = themeColors.commandColors
 
+        // 1. Options (# lines)
         reOption.findAll(slice).forEach { m ->
             editable.setSpan(
                 CSSpan(optionColor),
-                range.first + m.range.first,
-                range.first + m.range.last + 1,
-                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                startOffset + m.range.first,
+                startOffset + m.range.last + 1,
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
             )
         }
 
-        reCommandLine.findAll(slice).forEach { m ->
-            // Extract the line text for this command
-            val lineStartInSlice = m.range.first
-            val lineEndInSlice = m.range.last + 1
+        // 2. ChoiceScript commands (*command ...)
+        var indexInSlice = 0
+        while (indexInSlice < slice.length) {
+            val lineStartInSlice = indexInSlice
+            val newlineIndex = slice.indexOf('\n', indexInSlice)
+            val lineEndInSlice = if (newlineIndex == -1) slice.length else newlineIndex
             val lineText = slice.subSequence(lineStartInSlice, lineEndInSlice).toString()
 
-            // Find '*' and the command word after it
-            val starIndex = lineText.indexOf('*')
-            if (starIndex >= 0 && starIndex + 1 < lineText.length) {
+            val firstNonSpace = lineText.indexOfFirst { !it.isWhitespace() }
+            if (firstNonSpace >= 0 && lineText[firstNonSpace] == '*') {
+                val starIndex = firstNonSpace
+
                 var i = starIndex + 1
                 while (i < lineText.length && lineText[i].isWhitespace()) i++
                 val cmdStart = i
-                while (i < lineText.length && (lineText[i].isLetterOrDigit() || lineText[i] == '_')) i++
+                while (i < lineText.length && (lineText[i].isLetterOrDigit() || lineText[i] == '_')) {
+                    i++
+                }
                 val cmdEnd = i
 
                 if (cmdEnd > cmdStart) {
                     val cmd = lineText.substring(cmdStart, cmdEnd).lowercase()
                     val color = commandColors[cmd] ?: defaultCommandColor
 
-                    // color * + command word as one unit
-                    val absoluteStart = range.first + lineStartInSlice + starIndex
-                    val absoluteEnd = range.first + lineStartInSlice + cmdEnd
+                    val absoluteStart = startOffset + lineStartInSlice + starIndex
+                    val absoluteEnd = startOffset + lineStartInSlice + cmdEnd
 
                     editable.setSpan(
                         CSSpan(color),
                         absoluteStart,
                         absoluteEnd,
-                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
                     )
                 }
             }
+
+            indexInSlice = if (newlineIndex == -1) slice.length else newlineIndex + 1
         }
 
+        // 3. Inline variables (${...})
         reInlineVar.findAll(slice).forEach { m ->
             editable.setSpan(
                 CSSpan(inlineVarColor),
-                range.first + m.range.first,
-                range.first + m.range.last + 1,
-                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                startOffset + m.range.first,
+                startOffset + m.range.last + 1,
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
             )
         }
     }
@@ -678,12 +731,22 @@ class EditorActivityV3 : AppCompatActivity() {
         val trimmed = prevLine.trimStart()
         var indentSpaces = leadingSpaces
 
+        // 1. Logic for INCREASING Indent
         if (trimmed.startsWith("*choice", true) ||
             trimmed.startsWith("*fake_choice", true) ||
             trimmed.startsWith("*if", true) ||
             trimmed.startsWith("#")
         ) {
             indentSpaces = leadingSpaces + 4
+        }
+
+        // 2. Logic for RESETTING Indent (NEW SECTION)
+        // If the previous line was a *goto or *return, reset indent to 0.
+        if (trimmed.startsWith("*goto", true) ||
+            trimmed.startsWith("*return", true) ||
+            trimmed.startsWith("*finish", true) // Added *finish as it's a similar flow control command
+        ) {
+            indentSpaces = 0
         }
 
         if (indentSpaces > 0) {
@@ -694,12 +757,17 @@ class EditorActivityV3 : AppCompatActivity() {
                 editable.insert(pos, spaces)
                 editor.setSelection((pos + indentSpaces).coerceAtMost(editable.length))
             }
+        } else if (indentSpaces == 0) {
+            val spaces = " ".repeat(0)
+            editable.insert(pos, spaces)
+            editor.setSelection(pos)
         }
     }
 
     private fun maybeShowAutoComplete() {
         val editable = editor.text ?: return
-        val cursor = editor.selectionStart
+        val cursor = lastCursorPosition
+
         if (cursor <= 0) {
             autoCompletePopup.dismiss()
             return
@@ -712,13 +780,11 @@ class EditorActivityV3 : AppCompatActivity() {
             start--
         }
 
-        //  Only trigger when there is a * immediately before the word
         if (start == 0 || text[start - 1] != '*') {
             autoCompletePopup.dismiss()
             return
         }
 
-        // If there are no characters after *, no autocomplete yet
         if (cursor <= start) {
             autoCompletePopup.dismiss()
             return
@@ -752,12 +818,10 @@ class EditorActivityV3 : AppCompatActivity() {
         autoCompletePopup.show()
     }
 
-    // ---- keyboard centering ----
     private fun setupKeyboardCentering(root: View) {
         root.viewTreeObserver.addOnGlobalLayoutListener(
             object : ViewTreeObserver.OnGlobalLayoutListener {
                 override fun onGlobalLayout() {
-                    // Only care when editor has focus
                     if (!editor.isFocused) return
 
                     val r = Rect()
@@ -766,10 +830,8 @@ class EditorActivityV3 : AppCompatActivity() {
                     val totalHeight = root.rootView.height
                     val heightDiff = totalHeight - visibleHeight
 
-                    // Keyboard considered visible if more than 15% of screen height is covered
                     val keyboardVisible = heightDiff > totalHeight * 0.15f
                     if (!keyboardVisible) {
-                        // If the keyboard is gone clear any pending recenter so taps don't trigger jumps later
                         caretRecenterRequested = false
                         return
                     }
@@ -789,19 +851,16 @@ class EditorActivityV3 : AppCompatActivity() {
 
                     val loc = IntArray(2)
                     editor.getLocationOnScreen(loc)
-                    // Convert caret position to screen coordinates
                     val caretTopOnScreen = loc[1] + lineTop - editor.scrollY
                     val caretBottomOnScreen = loc[1] + lineBottom - editor.scrollY
 
                     val keyboardTop = r.bottom
 
-                    // If the caret line is above the keyboard, then it's already visible enough. Don't move anything
                     if (caretBottomOnScreen <= keyboardTop) {
                         caretRecenterRequested = false
                         return
                     }
 
-                    // When the cursor is hidden behind the keyboard, scroll so the line sits a bit above it
                     val lineHeight = lineBottom - lineTop
                     val targetY = keyboardTop - lineHeight * 2
                     val caretMid = (caretTopOnScreen + caretBottomOnScreen) / 2
