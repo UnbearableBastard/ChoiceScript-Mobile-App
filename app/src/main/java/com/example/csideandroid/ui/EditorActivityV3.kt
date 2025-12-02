@@ -62,7 +62,7 @@ class EditorActivityV3 : AppCompatActivity() {
 
     private var caretRecenterRequested = false
 
-    // NEW: Variable to store raw cursor position immediately on text change
+    // Variable to store raw cursor position immediately on text change
     private var lastCursorPosition: Int = 0
 
     private val HIGHLIGHT_DELAY_MS = 300L
@@ -211,14 +211,11 @@ class EditorActivityV3 : AppCompatActivity() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
 
-            // MINIMAL WORK HERE TO AVOID BLOCKING THE UI THREAD
             override fun afterTextChanged(s: Editable) {
                 caretRecenterRequested = true
 
-                // Store cursor position immediately. This is cheap.
+                // Store cursor position immediately.
                 lastCursorPosition = editor.selectionStart
-
-                // Schedule both expensive jobs. They will do the layout/string calculations later.
                 scheduleHighlight()
                 scheduleAutoComplete()
             }
@@ -237,7 +234,7 @@ class EditorActivityV3 : AppCompatActivity() {
             false
         }
 
-        editor.post { scheduleHighlight() } // Initial highlight
+        editor.post { scheduleHighlight() }
 
         initValidationWebView()
 
@@ -250,15 +247,14 @@ class EditorActivityV3 : AppCompatActivity() {
         mainScope.cancel()
     }
 
-    // ----------------------------------------------------------------
-    // UPDATED: scheduleAutoComplete() no longer takes a 'line' parameter
-    // ----------------------------------------------------------------
+
+    // ScheduleAutoComplete() no longer takes a 'line' parameter
+
     private fun scheduleAutoComplete() {
         autocompleteJob?.cancel()
 
         autocompleteJob = mainScope.launch {
             delay(AUTOCOMPLETE_DELAY_MS)
-            // Perform the heavy check and show logic inside the debounced job
             maybeShowAutoComplete()
         }
     }
@@ -667,7 +663,7 @@ class EditorActivityV3 : AppCompatActivity() {
             )
         }
 
-        // 2. ChoiceScript commands (*command ...)
+        // 2. ChoiceScript commands
         var indexInSlice = 0
         while (indexInSlice < slice.length) {
             val lineStartInSlice = indexInSlice
@@ -731,7 +727,7 @@ class EditorActivityV3 : AppCompatActivity() {
         val trimmed = prevLine.trimStart()
         var indentSpaces = leadingSpaces
 
-        // 1. Logic for INCREASING Indent
+        // 1. Logic for increasing indent
         if (trimmed.startsWith("*choice", true) ||
             trimmed.startsWith("*fake_choice", true) ||
             trimmed.startsWith("*if", true) ||
@@ -740,7 +736,6 @@ class EditorActivityV3 : AppCompatActivity() {
             indentSpaces = leadingSpaces + 4
         }
 
-        // 2. Logic for RESETTING Indent (NEW SECTION)
         // If the previous line was a *goto or *return, reset indent to 0.
         if (trimmed.startsWith("*goto", true) ||
             trimmed.startsWith("*return", true) ||
