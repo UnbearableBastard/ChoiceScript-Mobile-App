@@ -164,7 +164,7 @@ class LineNumberEditText @JvmOverloads constructor(
         val s = minOf(start, end)
         val e = maxOf(start, end)
 
-        //  keep the caret on the same visual line/column after indent/outdent.
+        // keep the caret on the same visual line/column after indent/outdent.
         val caret = if (start == end) start else -1
         var caretNewPos = -1
 

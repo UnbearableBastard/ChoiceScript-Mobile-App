@@ -42,7 +42,27 @@ class ProjectFilesActivity : AppCompatActivity() {
     private var scenesDir: DocumentFile? = null
     private var cache: List<DocumentFile> = emptyList()
 
-    // Cache for file metadata (size + words) so we don't recompute on every bind
+    private val prefs by lazy { getSharedPreferences("cside_prefs", MODE_PRIVATE) }
+
+    private fun loadOrder(projectName: String): List<String> {
+        val raw = prefs.getString("order_files_$projectName", "") ?: ""
+        if (raw.isBlank()) return emptyList()
+        return raw.split("|").filter { it.isNotBlank() }
+    }
+
+    private fun saveOrder(projectName: String, list: List<File>) {
+        val joined = list.joinToString("|") { it.name }
+        prefs.edit().putString("order_files_$projectName", joined).apply()
+    }
+
+    private fun applyOrder(raw: List<File>, saved: List<String>): List<File> {
+        if (saved.isEmpty()) return raw
+        val map = raw.associateBy { it.name }
+        val ordered = saved.mapNotNull { map[it] }
+        val leftovers = raw.filter { it.name !in saved }
+        return ordered + leftovers
+    }
+
     private val fileMetaCache = mutableMapOf<String, Pair<String, String>>()
     private val fileMetaInProgress = java.util.Collections.synchronizedSet(mutableSetOf<String>())
 
@@ -79,15 +99,12 @@ class ProjectFilesActivity : AppCompatActivity() {
         val toolbar = findViewById<MaterialToolbar>(R.id.topAppBar)
         toolbar.title = ""
 
-        // Inflate menu (+ New & Run)
         toolbar.inflateMenu(R.menu.menu_project_files)
 
-        // New File button
         toolbar.menu.findItem(R.id.action_new_txt).actionView
             ?.findViewById<android.widget.Button>(R.id.btnNewFile)
             ?.setOnClickListener { promptNewFile() }
 
-        // Back arrow
         toolbar.navigationIcon = AppCompatResources.getDrawable(
             this,
             androidx.appcompat.R.drawable.abc_ic_ab_back_material
@@ -95,11 +112,9 @@ class ProjectFilesActivity : AppCompatActivity() {
         toolbar.navigationIcon?.setTint(Color.WHITE)
         toolbar.setNavigationOnClickListener { finish() }
 
-        // Tint all menu icons (Run, etc.) to white
         for (i in 0 until toolbar.menu.size()) {
             toolbar.menu.getItem(i).icon?.setTint(Color.WHITE)
         }
-        // Explicitly tint the overflow (three dots) icon next to Run to white as well
         toolbar.overflowIcon = toolbar.overflowIcon?.mutate()?.apply {
             setTint(Color.WHITE)
         }
@@ -121,8 +136,6 @@ class ProjectFilesActivity : AppCompatActivity() {
 
         recycler = findViewById(R.id.recyclerFiles)
 
-        // Ensure the last file card is not hidden behind the system navigation bar.
-        // Keep whatever padding is defined in XML and add the bottom nav-bar inset.
         val initialLeft = recycler.paddingLeft
         val initialTop = recycler.paddingTop
         val initialRight = recycler.paddingRight
@@ -148,48 +161,46 @@ class ProjectFilesActivity : AppCompatActivity() {
         adapter = ProjectFilesAdapter(
             metaProvider = { f -> metaFor(f) },
             onOpenTxt = { openTxt(it) },
-            onRename  = { rename(it) },
-            onDelete  = { delete(it) },
+            onRename = { rename(it) },
+            onDelete = { delete(it) },
             isProtected = {
                 it.name.equals("startup.txt", true) ||
                         it.name.equals("choicescript_stats.txt", true)
             }
         )
         recycler.adapter = adapter
+
         loadFiles()
 
-        // Enable drag-and-drop reordering of file cards via long-press-and-drag.
-        val touchHelper = ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(
-            ItemTouchHelper.UP or ItemTouchHelper.DOWN,
-            0
-        ) {
-            override fun onMove(
-                recyclerView: RecyclerView,
-                viewHolder: RecyclerView.ViewHolder,
-                target: RecyclerView.ViewHolder
-            ): Boolean {
-                val from = viewHolder.bindingAdapterPosition
-                val to = target.bindingAdapterPosition
+        val touchHelper = ItemTouchHelper(object :
+            ItemTouchHelper.SimpleCallback(
+                ItemTouchHelper.UP or ItemTouchHelper.DOWN,
+                0
+            ) {
+
+            override fun onMove(rv: RecyclerView, vh: RecyclerView.ViewHolder, tgt: RecyclerView.ViewHolder): Boolean {
+                val from = vh.bindingAdapterPosition
+                val to = tgt.bindingAdapterPosition
                 if (from == RecyclerView.NO_POSITION || to == RecyclerView.NO_POSITION) return false
+
+                val projectName = projectTree?.name ?: return false
 
                 val current = adapter.currentList.toMutableList()
                 if (from !in current.indices || to !in current.indices) return false
 
                 val item = current.removeAt(from)
                 current.add(to, item)
+
                 adapter.submit(current)
 
+                saveOrder(projectName, current)
+
                 return true
             }
 
-            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
-                // no-op; no swipe actions in this screen
-            }
+            override fun onSwiped(vh: RecyclerView.ViewHolder, dir: Int) {}
 
-            override fun isLongPressDragEnabled(): Boolean {
-                // Use built-in long-press (about ~0.5–1s) to start drag
-                return true
-            }
+            override fun isLongPressDragEnabled(): Boolean = true
         })
         touchHelper.attachToRecyclerView(recycler)
     }
@@ -200,31 +211,23 @@ class ProjectFilesActivity : AppCompatActivity() {
         return project
     }
 
+    // Load files with restored order
     private fun loadFiles() {
         val list = scenesDir?.listFiles()?.filter { it.isFile } ?: emptyList()
         cache = list
-        adapter.submit(list.map { File(it.name ?: "") })
-    }
 
-    //
-    // meta1 = first line under filename
-    // meta2 = second line under filename
-    //
-    // For .txt files:
-    //   meta1: "<size> – <words> words"
-    //   meta2: "<last modified relative>"
-    //
-    // For non-txt:
-    //   meta1: "<size>"
-    //   meta2: "<last modified relative>"
+        val rawFiles = list.map { File(it.name ?: "") }
+        val projectName = projectTree?.name ?: ""
+
+        val saved = loadOrder(projectName)
+        val finalList = applyOrder(rawFiles, saved)
+
+        adapter.submit(finalList)
+    }
 
     private fun metaFor(fake: File): Pair<String, String> {
         val name = fake.name ?: return "—" to "—"
-
-        // 1) If we already have cached metadata, return it immediately
         fileMetaCache[name]?.let { return it }
-
-        // 2) Map to DocumentFile
         val df = cache.firstOrNull { it.name == name } ?: return "—" to "—"
 
         val sizeStr = Formatter.formatShortFileSize(this, df.length())
@@ -236,21 +239,15 @@ class ProjectFilesActivity : AppCompatActivity() {
                     System.currentTimeMillis(),
                     DateUtils.MINUTE_IN_MILLIS
                 ).toString()
-            else
-                "—"
+            else "—"
 
-        // 3) Base meta: cheap info only (size + "calculating…" if .txt)
         val baseMeta: Pair<String, String> =
-            if (df.name?.endsWith(".txt", ignoreCase = true) == true) {
+            if (df.name?.endsWith(".txt", ignoreCase = true) == true)
                 "$sizeStr – calculating words…" to whenStr
-            } else {
-                sizeStr to whenStr
-            }
+            else sizeStr to whenStr
 
-        // Cache the cheap result so next bind is instant
         fileMetaCache[name] = baseMeta
 
-        // 4) Kick off background word-count for .txt files (once per file)
         if (df.name?.endsWith(".txt", ignoreCase = true) == true &&
             !fileMetaInProgress.contains(name)
         ) {
@@ -261,17 +258,9 @@ class ProjectFilesActivity : AppCompatActivity() {
                     val nf = NumberFormat.getIntegerInstance()
                     val wordsStr = nf.format(words)
                     val finalMeta = "$sizeStr – $wordsStr words" to whenStr
-
-                    // Update cache then refresh list on UI thread
                     fileMetaCache[name] = finalMeta
-                    runOnUiThread {
-                        adapter.notifyDataSetChanged()
-                    }
-                } catch (_: Exception) {
-                    // ignore errors, keep baseMeta
-                } finally {
-                    fileMetaInProgress.remove(name)
-                }
+                    runOnUiThread { adapter.notifyDataSetChanged() }
+                } finally { fileMetaInProgress.remove(name) }
             }.start()
         }
 
@@ -483,7 +472,7 @@ class ProjectFilesActivity : AppCompatActivity() {
                 '\\' -> sb.append("\\\\")
                 '"'  -> sb.append("\\\"")
                 '\n' -> sb.append("\\n")
-                '\r' -> { /* skip */ }
+                '\r' -> {}
                 '\t' -> sb.append("\\t")
                 else -> {
                     if (ch < ' ') {

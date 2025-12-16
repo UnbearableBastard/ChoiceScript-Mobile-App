@@ -4,8 +4,8 @@ import android.graphics.Color
 import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
-import android.os.Looper
 import android.text.Editable
+import android.text.InputType
 import android.text.Spannable
 import android.text.TextWatcher
 import android.text.style.ForegroundColorSpan
@@ -14,32 +14,38 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.ViewTreeObserver
 import android.view.WindowManager
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import android.widget.ArrayAdapter
 import android.widget.ImageButton
+import android.widget.ListView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.appcompat.widget.ListPopupWindow
 import androidx.core.view.ViewCompat
-import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowCompat
 import androidx.documentfile.provider.DocumentFile
 import com.example.csideandroid.R
 import com.google.android.material.appbar.MaterialToolbar
 import kotlinx.coroutines.*
-import org.json.JSONObject
 import java.io.OutputStreamWriter
 import kotlin.math.max
+import android.annotation.SuppressLint
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
+import android.webkit.JavascriptInterface
+import androidx.webkit.WebViewAssetLoader
+import org.json.JSONObject
 
 class EditorActivityV3 : AppCompatActivity() {
 
     // ---- syntax data for highlighting / autocomplete ----
     private val csCommands: Set<String> = setOf(
         "achieve","achievement","check_achievements",
-        "choice","fake_choice","disable_reuse","hide_reuse","allow_reuse","selectable_if",
+        "choice","fake_choice","disable_reuse","disable_reuse","allow_reuse","selectable_if",
         "create","create_array","temp","temp_array","set","setref","delete","input_number","input_text","print","rand",
         "if","elseif","else","elsif","return","params",
         "label","goto","goto_scene","goto_random_scene","gosub","gosub_scene","finish","ending","redirect_scene",
@@ -51,19 +57,13 @@ class EditorActivityV3 : AppCompatActivity() {
     // theme colors
     private lateinit var themeColors: EditorThemeColors
 
-    private val reCommandLine = Regex("(?m)(^|\\n)\\s*\\*[a-z_][^\\r\\n]*")
     private val reOption      = Regex("(?m)^\\s*#.*$")
     private val reInlineVar   = Regex("\\$!?\\{[^}\\n]*\\}")
 
-    // --- Coroutine Debouncing State ---
+    // Coroutine Debouncing State
     private val mainScope = CoroutineScope(Dispatchers.Main.immediate)
     private var autocompleteJob: Job? = null
     private var highlightJob: Job? = null
-
-    private var caretRecenterRequested = false
-
-    // Variable to store raw cursor position immediately on text change
-    private var lastCursorPosition: Int = 0
 
     private val HIGHLIGHT_DELAY_MS = 300L
     private val AUTOCOMPLETE_DELAY_MS = 250L
@@ -72,6 +72,7 @@ class EditorActivityV3 : AppCompatActivity() {
     private lateinit var editor: LineNumberEditText
     private lateinit var toolbar: MaterialToolbar
 
+    // UI components (defined later for brevity)
     private lateinit var btnUndo: ImageButton
     private lateinit var btnRedo: ImageButton
     private lateinit var btnIndent: ImageButton
@@ -92,10 +93,13 @@ class EditorActivityV3 : AppCompatActivity() {
     private var lastIndex: Int = -1
     private var isSelectionMode: Boolean = false
     private var currentTextSizeSp: Float = 0f
+    private var caretRecenterRequested = false
+    private var lastCursorPosition: Int = 0
 
 
-    private lateinit var validationWebView: WebView
-    private var validationReady: Boolean = false
+    var isCheckerReady: Boolean = false // Flag kept but unused
+    private var isChecking = false
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -105,15 +109,18 @@ class EditorActivityV3 : AppCompatActivity() {
 
         toolbar = findViewById(R.id.toolbar)
         editor = findViewById(R.id.editor)
+
+        editor.inputType = editor.inputType or (
+                InputType.TYPE_CLASS_TEXT or
+                        InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+                        InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+                )
         currentTextSizeSp = editor.textSize / resources.displayMetrics.scaledDensity
 
-        // load and apply current theme
         val currentTheme = EditorThemeManager.getCurrentTheme(this)
         applyTheme(currentTheme)
-
         inflateDefaultMenu()
 
-        // Load file
         var displayName = intent.getStringExtra("extra_display_name")
         val uriStr = intent.getStringExtra("extra_document_uri")
         if (!uriStr.isNullOrEmpty()) {
@@ -138,7 +145,6 @@ class EditorActivityV3 : AppCompatActivity() {
             ?.let { d -> d.setTint(Color.WHITE); toolbar.navigationIcon = d }
         toolbar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
 
-        // status bar spacer and bottom padding for editor_container
         val spacer = findViewById<View>(R.id.statusBarSpacer)
         ViewCompat.setOnApplyWindowInsetsListener(spacer) { v, ins ->
             val top = ins.getInsets(WindowInsetsCompat.Type.statusBars()).top
@@ -153,7 +159,6 @@ class EditorActivityV3 : AppCompatActivity() {
             ins
         }
 
-        // Bottom bar
         btnUndo = findViewById(R.id.btnUndo)
         btnRedo = findViewById(R.id.btnRedo)
         btnIndent = findViewById(R.id.btnIndent)
@@ -169,8 +174,27 @@ class EditorActivityV3 : AppCompatActivity() {
         btnIndent.setOnClickListener { editor.outdent() }
         btnOutdent.setOnClickListener { editor.indent() }
         btnSearch.setOnClickListener { promptSearch() }
-        btnSave.setOnClickListener { saveDocument() }
-        btnFormat.setOnClickListener { confirmFormatDocument() }
+        // Old Format button and now Error Checker button
+        btnFormat.setOnClickListener {
+            val text = editor.text?.toString() ?: ""
+
+            checkChoiceScriptWithEngine(text) { engineError ->
+                if (engineError != null) {
+                    AlertDialog.Builder(this)
+                        .setTitle("ChoiceScript Engine Error")
+                        .setMessage(engineError)
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show()
+                    return@checkChoiceScriptWithEngine
+                }
+
+                AlertDialog.Builder(this)
+                    .setTitle("ChoiceScript Check")
+                    .setMessage("No errors found in this file.")
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show()
+            }
+        }
 
         btnZoomIn.setOnClickListener {
             currentTextSizeSp = (currentTextSizeSp + 2f).coerceAtMost(36f)
@@ -184,13 +208,11 @@ class EditorActivityV3 : AppCompatActivity() {
             editor.invalidateLineNumbers()
         }
 
-
-        // Autocomplete
         autoCompleteAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, mutableListOf())
         autoCompletePopup = ListPopupWindow(this).apply {
             anchorView = editor
             isModal = false
-            inputMethodMode = ListPopupWindow.INPUT_METHOD_NEEDED
+            inputMethodMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
             softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
             setAdapter(autoCompleteAdapter)
             setOnItemClickListener { _, _, position, _ ->
@@ -210,11 +232,8 @@ class EditorActivityV3 : AppCompatActivity() {
         editor.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-
             override fun afterTextChanged(s: Editable) {
                 caretRecenterRequested = true
-
-                // Store cursor position immediately.
                 lastCursorPosition = editor.selectionStart
                 scheduleHighlight()
                 scheduleAutoComplete()
@@ -235,9 +254,6 @@ class EditorActivityV3 : AppCompatActivity() {
         }
 
         editor.post { scheduleHighlight() }
-
-        initValidationWebView()
-
         val root = findViewById<View>(android.R.id.content)
         setupKeyboardCentering(root)
     }
@@ -245,18 +261,7 @@ class EditorActivityV3 : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         mainScope.cancel()
-    }
-
-
-    // ScheduleAutoComplete() no longer takes a 'line' parameter
-
-    private fun scheduleAutoComplete() {
-        autocompleteJob?.cancel()
-
-        autocompleteJob = mainScope.launch {
-            delay(AUTOCOMPLETE_DELAY_MS)
-            maybeShowAutoComplete()
-        }
+        // Removed WebView cleanup
     }
 
     override fun onPause() {
@@ -266,7 +271,14 @@ class EditorActivityV3 : AppCompatActivity() {
         saveDocument(showToast = true)
     }
 
-    // ---- theme ----
+    private fun scheduleAutoComplete() {
+        autocompleteJob?.cancel()
+        autocompleteJob = mainScope.launch {
+            delay(AUTOCOMPLETE_DELAY_MS)
+            maybeShowAutoComplete()
+        }
+    }
+
     private fun applyTheme(theme: EditorTheme) {
         themeColors = EditorThemeManager.colorsFor(theme)
         editor.setBackgroundColor(themeColors.background)
@@ -276,22 +288,25 @@ class EditorActivityV3 : AppCompatActivity() {
     }
 
     private fun showThemePicker() {
+        // Theme Picker
         val themes = arrayOf(
-            EditorTheme.CLASSIC,
-            EditorTheme.DARK,
-            EditorTheme.SOLARIZED,
-            EditorTheme.NORD,
-            EditorTheme.MONOKAI,
-            EditorTheme.DRACULA
+            EditorTheme.CLASSIC, EditorTheme.DARK, EditorTheme.SOLARIZED,
+            EditorTheme.NORD, EditorTheme.MONOKAI, EditorTheme.DRACULA,
+            EditorTheme.STAR_WARS_EMPIRE, EditorTheme.DUNE_ARRAKIS,
+            EditorTheme.CYBERPUNK_NIGHTCITY, EditorTheme.JEDI_ORDER,
+            EditorTheme.FALLOUT_PIPBOY,
+            EditorTheme.MASS_EFFECT_N7, EditorTheme.HP_GRYFFINDOR,
+            EditorTheme.HP_HUFFLEPUFF, EditorTheme.HP_RAVENCLAW,
+            EditorTheme.HP_SLYTHERIN, EditorTheme.DESERT_DUNES,
+            EditorTheme.NO_MANS_SKY
         )
 
         val labels = arrayOf(
-            "Classic (White + Rainbow)",
-            "Dark",
-            "Solarized",
-            "Nord",
-            "Monokai",
-            "Dracula"
+            "Classic (White + Rainbow)", "Dark", "Solarized", "Nord", "Monokai", "Dracula",
+            "Star Wars — Imperial Terminal", "Dune — Arrakis", "Cyberpunk 2077 — Night City",
+            "Jedi Order — Temple Archives", "Fallout — Pip-Boy 3000", "Mass Effect — N7",
+            "Gryffindor", "Hufflepuff", "Ravenclaw", "Slytherin", "Desert Dunes",
+            "No Man's Sky"
         )
 
         val current = EditorThemeManager.getCurrentTheme(this)
@@ -309,65 +324,6 @@ class EditorActivityV3 : AppCompatActivity() {
             .show()
     }
 
-    // ---- hidden WebView setup for ChoiceScript validation ----
-    private fun initValidationWebView() {
-        validationWebView = WebView(this).apply {
-            settings.javaScriptEnabled = true
-            visibility = View.GONE
-            webViewClient = object : WebViewClient() {
-                override fun onPageFinished(view: WebView?, url: String?) {
-                    injectValidationScript()
-                }
-            }
-        }
-        // Load the ChoiceScript runner HTML from assets
-        validationWebView.loadUrl("file:///android_asset/choicescript/web/index.html")
-    }
-
-    private fun injectValidationScript() {
-        val js = """
-        (function() {
-          window.validateChoiceScript = function(text) {
-            try {
-              if (typeof Scene === 'undefined') {
-                return { ok: false, errors: ["ChoiceScript engine not loaded."] };
-              }
-              if (typeof SceneNavigator === 'undefined') {
-                return { ok: false, errors: ["SceneNavigator not available."] };
-              }
-              if (typeof nav === 'undefined' || !nav) {
-                nav = new SceneNavigator(["startup"]);
-              }
-              if (typeof stats === 'undefined' || !stats) {
-                stats = {};
-              }
-              var scene = new Scene("editor_validate", stats, nav, { debugMode: true });
-              var lines = String(text).split(/\r?\n/);
-              scene.loadLinesFast(0, lines, {});
-              scene.quicktest = true;
-              scene.randomtest = false;
-              var safetyCounter = 0;
-              while (!scene.finished && safetyCounter < 100000) {
-                scene.execute();
-                safetyCounter++;
-              }
-              return { ok: true, errors: [] };
-            } catch (e) {
-              var msg = (e && e.message) ? String(e.message) : String(e);
-              return { ok: false, errors: [msg] };
-            }
-          };
-        })();
-    """.trimIndent()
-
-        validationWebView.evaluateJavascript(js) {
-            validationReady = true
-        }
-    }
-
-
-
-    // ---- menu helpers ----
     private fun inflateDefaultMenu() {
         toolbar.menu.clear()
         toolbar.inflateMenu(R.menu.editor_menu)
@@ -381,8 +337,6 @@ class EditorActivityV3 : AppCompatActivity() {
             }
         }
     }
-
-
 
     private fun wrapSelectionWithChoiceScriptTag(openTag: String, closeTag: String) {
         val text = editor.text ?: return
@@ -403,154 +357,51 @@ class EditorActivityV3 : AppCompatActivity() {
 
     private fun enterSelectionMode() {
         isSelectionMode = true
-
-        // Swap toolbar to text actions menu while there is a selection
         toolbar.menu.clear()
         toolbar.inflateMenu(R.menu.menu_text_actions)
-
         toolbar.setOnMenuItemClickListener { item ->
             when (item.itemId) {
-                R.id.action_select_all -> {
-                    editor.selectAll()
-                    true
-                }
-                R.id.action_cut -> {
-                    editor.onTextContextMenuItem(android.R.id.cut)
-                    true
-                }
-                R.id.action_copy -> {
-                    editor.onTextContextMenuItem(android.R.id.copy)
-                    true
-                }
-                R.id.action_paste -> {
-                    editor.onTextContextMenuItem(android.R.id.paste)
-                    true
-                }
-                R.id.action_bold -> {
-                    wrapSelectionWithChoiceScriptTag("[b]", "[/b]")
-                    true
-                }
-                R.id.action_italic -> {
-                    wrapSelectionWithChoiceScriptTag("[i]", "[/i]")
-                    true
-                }
+                R.id.action_select_all -> { editor.selectAll(); true }
+                R.id.action_cut -> { editor.onTextContextMenuItem(android.R.id.cut); true }
+                R.id.action_copy -> { editor.onTextContextMenuItem(android.R.id.copy); true }
+                R.id.action_paste -> { editor.onTextContextMenuItem(android.R.id.paste); true }
+                R.id.action_bold -> { wrapSelectionWithChoiceScriptTag("[b]", "[/b]"); true }
+                R.id.action_italic -> { wrapSelectionWithChoiceScriptTag("[i]", "[/i]"); true }
                 else -> false
             }
         }
     }
     private fun exitSelectionMode()  { isSelectionMode = false; inflateDefaultMenu() }
 
-    // ---- ChoiceScript error checking (selection only) ----
-
-    private fun confirmFormatDocument() {
-        val selStart = editor.selectionStart
-        val selEnd   = editor.selectionEnd
-
-        if (selStart == selEnd || selStart < 0 || selEnd < 0) {
-            AlertDialog.Builder(this)
-                .setTitle(R.string.format_confirm_title)
-                .setMessage(getString(R.string.format_select_prompt))
-                .setPositiveButton(android.R.string.ok, null)
-                .show()
-            return
-        }
-
-        AlertDialog.Builder(this)
-            .setTitle(R.string.format_confirm_title)
-            .setMessage("Check the selected text for ChoiceScript errors?")
-            .setPositiveButton(android.R.string.ok) { _, _ -> formatSelectedBlock() }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    private fun lineStart(text: CharSequence, index: Int): Int {
-        if (index <= 0) return 0
-        val i = text.lastIndexOf('\n', (index - 1).coerceAtLeast(0))
-        return if (i == -1) 0 else i + 1
-    }
-    private fun lineEnd(text: CharSequence, index: Int): Int {
-        val s = index.coerceAtMost(text.length)
-        val i = text.indexOf('\n', s)
-        return if (i == -1) text.length else i + 1
-    }
-
-
-
-    private fun formatSelectedBlock() {
+    private fun goToLine(lineNumber: Int) {
         val editable = editor.text ?: return
-        val selStart = editor.selectionStart
-        val selEnd   = editor.selectionEnd
+        val text = editable.toString()
+        if (text.isEmpty()) return
 
-        if (selStart < 0 || selEnd < 0 || selStart == selEnd) {
-            AlertDialog.Builder(this)
-                .setTitle(R.string.format_confirm_title)
-                .setMessage(getString(R.string.format_select_prompt))
-                .setPositiveButton(android.R.string.ok, null)
-                .show()
-            return
+        val targetLine = lineNumber.coerceAtLeast(1)
+        var currentLine = 1
+        var index = 0
+
+        while (index < text.length && currentLine < targetLine) {
+            if (text[index] == '\n') currentLine++
+            index++
         }
 
-        val blockStart = lineStart(editable, selStart)
-        val blockEnd   = lineEnd(editable, selEnd)
-        val slice = editable.subSequence(blockStart, blockEnd).toString()
+        val targetIndex = index.coerceAtMost(text.length)
+        editor.requestFocus()
+        editor.setSelection(targetIndex)
 
-        if (!validationReady) {
-            AlertDialog.Builder(this)
-                .setTitle("Validator not ready")
-                .setMessage("The ChoiceScript validator is still initializing. Please try again in a moment.")
-                .setPositiveButton(android.R.string.ok, null)
-                .show()
-            return
-        }
-
-        if (slice.isBlank()) {
-            AlertDialog.Builder(this)
-                .setTitle(R.string.format_confirm_title)
-                .setMessage("Selected text is blank.")
-                .setPositiveButton(android.R.string.ok, null)
-                .show()
-            return
-        }
-
-        val escaped = JSONObject.quote(slice)
-        val js = "window.validateChoiceScript(" + escaped + ")"
-
-        validationWebView.evaluateJavascript(js) { json ->
+        editor.post {
+            val layout = editor.layout ?: return@post
             try {
-                val obj = JSONObject(json ?: "{}")
-                val ok = obj.optBoolean("ok", false)
-                val errorsJson = obj.optJSONArray("errors")
-
-                if (ok || errorsJson == null || errorsJson.length() == 0) {
-                    runOnUiThread {
-                        AlertDialog.Builder(this)
-                            .setTitle(R.string.format_confirm_title)
-                            .setMessage("No errors found in selection.")
-                            .setPositiveButton(android.R.string.ok, null)
-                            .show()
-                    }
-                } else {
-                    val msgs = mutableListOf<String>()
-                    for (i in 0 until errorsJson.length()) {
-                        msgs += errorsJson.getString(i)
-                    }
-                    val message = msgs.joinToString("\n\n")
-                    runOnUiThread {
-                        AlertDialog.Builder(this)
-                            .setTitle("ChoiceScript errors")
-                            .setMessage(message)
-                            .setPositiveButton(android.R.string.ok, null)
-                            .show()
-                    }
-                }
+                // Ensure we don't access an out-of-bounds offset
+                val safeIndex = targetIndex.coerceAtMost(max(0, text.length - 1))
+                val line = layout.getLineForOffset(safeIndex)
+                val y = layout.getLineTop(line)
+                val targetY = y - (editor.height / 2)
+                editor.scrollTo(0, targetY.coerceAtLeast(0))
             } catch (e: Exception) {
-                runOnUiThread {
-                    AlertDialog.Builder(this)
-                        .setTitle("Validation error")
-                        .setMessage(e.message ?: "Error while checking selection.")
-                        .setPositiveButton(android.R.string.ok, null)
-                        .show()
-                }
+                // Fallback scroll if layout calculation fails
             }
         }
     }
@@ -602,21 +453,10 @@ class EditorActivityV3 : AppCompatActivity() {
 
     private fun scheduleHighlight() {
         highlightJob?.cancel()
-
         highlightJob = mainScope.launch {
             delay(HIGHLIGHT_DELAY_MS)
             rehighlight()
         }
-    }
-
-    private fun visibleCharRange(): IntRange {
-        val layout = editor.layout ?: return 0..(editor.text?.length ?: 0)
-        val first = layout.getLineForVertical(editor.scrollY)
-        val last  = layout.getLineForVertical(editor.scrollY + editor.height)
-        val pad   = (last - first).coerceAtMost(3)
-        val start = layout.getLineStart((first - pad).coerceAtLeast(0))
-        val end   = layout.getLineEnd((last + pad).coerceAtMost(layout.lineCount - 1))
-        return start..end
     }
 
     private inner class CSSpan(color: Int) : ForegroundColorSpan(color)
@@ -629,41 +469,27 @@ class EditorActivityV3 : AppCompatActivity() {
         }
     }
 
-    // ----------------------------------------------------------------
-    // Syntax highlighting for ChoiceScript commands / options / vars
-    // ----------------------------------------------------------------
     private fun rehighlight() {
         val editable = editor.text as? Spannable ?: return
-
         val length = editable.length
         if (length == 0) return
 
-        // For correctness, highlight the whole document.
         val startOffset = 0
         val endOffset = length
         val targetRange = startOffset until endOffset
 
-        // Remove our existing spans in this range
         clearOurSpans(editable, targetRange)
 
         val slice: CharSequence = editable.subSequence(startOffset, endOffset)
-
         val optionColor = themeColors.optionColor
         val inlineVarColor = themeColors.inlineVarColor
         val defaultCommandColor = themeColors.defaultCommandColor
         val commandColors = themeColors.commandColors
 
-        // 1. Options (# lines)
         reOption.findAll(slice).forEach { m ->
-            editable.setSpan(
-                CSSpan(optionColor),
-                startOffset + m.range.first,
-                startOffset + m.range.last + 1,
-                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
-            )
+            editable.setSpan(CSSpan(optionColor), startOffset + m.range.first, startOffset + m.range.last + 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
 
-        // 2. ChoiceScript commands
         var indexInSlice = 0
         while (indexInSlice < slice.length) {
             val lineStartInSlice = indexInSlice
@@ -674,46 +500,28 @@ class EditorActivityV3 : AppCompatActivity() {
             val firstNonSpace = lineText.indexOfFirst { !it.isWhitespace() }
             if (firstNonSpace >= 0 && lineText[firstNonSpace] == '*') {
                 val starIndex = firstNonSpace
-
                 var i = starIndex + 1
                 while (i < lineText.length && lineText[i].isWhitespace()) i++
                 val cmdStart = i
-                while (i < lineText.length && (lineText[i].isLetterOrDigit() || lineText[i] == '_')) {
-                    i++
-                }
+                while (i < lineText.length && (lineText[i].isLetterOrDigit() || lineText[i] == '_')) { i++ }
                 val cmdEnd = i
 
                 if (cmdEnd > cmdStart) {
                     val cmd = lineText.substring(cmdStart, cmdEnd).lowercase()
                     val color = commandColors[cmd] ?: defaultCommandColor
-
                     val absoluteStart = startOffset + lineStartInSlice + starIndex
                     val absoluteEnd = startOffset + lineStartInSlice + cmdEnd
-
-                    editable.setSpan(
-                        CSSpan(color),
-                        absoluteStart,
-                        absoluteEnd,
-                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
-                    )
+                    editable.setSpan(CSSpan(color), absoluteStart, absoluteEnd, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
                 }
             }
-
             indexInSlice = if (newlineIndex == -1) slice.length else newlineIndex + 1
         }
 
-        // 3. Inline variables (${...})
         reInlineVar.findAll(slice).forEach { m ->
-            editable.setSpan(
-                CSSpan(inlineVarColor),
-                startOffset + m.range.first,
-                startOffset + m.range.last + 1,
-                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
-            )
+            editable.setSpan(CSSpan(inlineVarColor), startOffset + m.range.first, startOffset + m.range.last + 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
     }
 
-    // ---- typing helpers ----
     private fun handleAutoIndent() {
         val editable = editor.text ?: return
         val pos = editor.selectionStart
@@ -727,7 +535,6 @@ class EditorActivityV3 : AppCompatActivity() {
         val trimmed = prevLine.trimStart()
         var indentSpaces = leadingSpaces
 
-        // 1. Logic for increasing indent
         if (trimmed.startsWith("*choice", true) ||
             trimmed.startsWith("*fake_choice", true) ||
             trimmed.startsWith("*if", true) ||
@@ -736,10 +543,9 @@ class EditorActivityV3 : AppCompatActivity() {
             indentSpaces = leadingSpaces + 4
         }
 
-        // If the previous line was a *goto or *return, reset indent to 0.
         if (trimmed.startsWith("*goto", true) ||
             trimmed.startsWith("*return", true) ||
-            trimmed.startsWith("*finish", true) // Added *finish as it's a similar flow control command
+            trimmed.startsWith("*finish", true)
         ) {
             indentSpaces = 0
         }
@@ -771,15 +577,11 @@ class EditorActivityV3 : AppCompatActivity() {
         val text = editable.toString()
         var start = cursor
 
-        while (start > 0 && text[start - 1].isLetterOrDigit()) {
-            start--
-        }
-
+        while (start > 0 && text[start - 1].isLetterOrDigit()) start--
         if (start == 0 || text[start - 1] != '*') {
             autoCompletePopup.dismiss()
             return
         }
-
         if (cursor <= start) {
             autoCompletePopup.dismiss()
             return
@@ -811,6 +613,41 @@ class EditorActivityV3 : AppCompatActivity() {
         autoCompletePopup.horizontalOffset = caretX - editor.scrollX - width / 2
         autoCompletePopup.verticalOffset = caretY - editor.scrollY + (editor.lineHeight * 0.1f).toInt()
         autoCompletePopup.show()
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun checkChoiceScriptWithEngine(text: String, callback: (String?) -> Unit) {
+        val webView = WebView(this)
+        webView.settings.javaScriptEnabled = true
+        webView.settings.domStorageEnabled = true
+
+        val assetLoader = WebViewAssetLoader.Builder()
+            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+            .build()
+
+        class ErrorBridge {
+            @JavascriptInterface
+            fun onResult(result: String) {
+                runOnUiThread { callback(if (result == "OK") null else result) }
+            }
+        }
+
+        webView.addJavascriptInterface(ErrorBridge(), "ErrorBridge")
+
+        webView.webViewClient = object : WebViewClient() {
+            override fun shouldInterceptRequest(
+                view: WebView, request: WebResourceRequest
+            ): WebResourceResponse? {
+                return assetLoader.shouldInterceptRequest(request.url)
+            }
+
+            override fun onPageFinished(view: WebView?, url: String?) {
+                val safeText = JSONObject.quote(text)
+                webView.evaluateJavascript("validateScene($safeText)", null)
+            }
+        }
+
+        webView.loadUrl("https://appassets.androidplatform.net/assets/checker.html")
     }
 
     private fun setupKeyboardCentering(root: View) {
