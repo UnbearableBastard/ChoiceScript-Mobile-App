@@ -146,8 +146,17 @@ class ProjectsBrowserActivity : AppCompatActivity() {
         allGrid.adapter = allAdapter
 
         setupDragAndDrop()
+        findViewById<View>(R.id.btnTutorial)?.setOnClickListener {
+            startActivity(Intent(this, TutorialActivity::class.java))
+        }
+
+        findViewById<View>(R.id.btnNewProject)?.setOnClickListener {
+            promptNewProject()
+        }
         reload()
     }
+
+
 
     override fun onDestroy() {
         super.onDestroy()

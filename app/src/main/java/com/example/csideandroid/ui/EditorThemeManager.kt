@@ -44,9 +44,15 @@ object EditorThemeManager {
 
     fun getCurrentTheme(context: Context): EditorTheme {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        // DEFAULT = CLASSIC (white + rainbow)
         val name = prefs.getString(KEY_THEME, EditorTheme.CLASSIC.name) ?: EditorTheme.CLASSIC.name
-        return runCatching { EditorTheme.valueOf(name) }.getOrElse { EditorTheme.CLASSIC }
+
+        return runCatching {
+            EditorTheme.valueOf(name)
+        }.getOrElse {
+            // Clean invalid legacy themes if any
+            prefs.edit { putString(KEY_THEME, EditorTheme.CLASSIC.name) }
+            EditorTheme.CLASSIC
+        }
     }
 
     fun setCurrentTheme(context: Context, theme: EditorTheme) {
