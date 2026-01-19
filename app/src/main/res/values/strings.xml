@@ -7,32 +7,15 @@
     <string name="choose_project_location">Choose Project Location</string>
 
     <!-- Project Browser Labels -->
-    <string name="title_projects">Projects</string>
-    <string name="no_projects_hint">No projects found. Create one first.</string>
-    <string name="no_file_open">No file open</string>
-    <string name="project_menu">Project options</string>
     <string name="pin">Pin</string>
-    <string name="title_new_project">New project</string>
-    <string name="create">Create</string>
-    <string name="cancel">Cancel</string>
-    <string name="hint_project_name">Project name</string>
-    <string name="error_empty_name">Please enter a name.</string>
-    <string name="error_invalid_name">That name has invalid characters.</string>
-    <string name="error_name_taken">A project with that name already exists.</string>
-    <string name="rename_failed">Rename failed</string>
-    <string name="delete_failed">Delete failed</string>
-    <string name="meta_last_opened">Last opened %1$s ago</string>
-    <string name="today">today</string>
 
     <!-- Editor Bar Action Labels -->
     <string name="undo">Undo</string>
     <string name="redo">Redo</string>
     <string name="find">Find</string>
-    <string name="previous">Previous</string>
     <string name="next">Next</string>
     <string name="save">Save</string>
     <string name="saved">Saved</string>
-    <string name="not_found">Not found</string>
     <string name="indent">Indent</string>
     <string name="outdent">Outdent</string>
 
@@ -41,32 +24,19 @@
     <string name="zoom_out">Zoom out</string>
 
     <!-- Search Action Label -->
+    <string name="previous">Previous</string>
+    <string name="close">Close</string>
     <string name="search">Search</string>
 
     <!-- Error (Used to beFormatting) button labels -->
     <string name="format">Format</string>
-    <string name="format_select_prompt">Select the lines you want to check for errors.</string>
 
     <!-- Label for the run/play button -->
-    <string name="run">Run</string>
 
     <!-- Text Selection Action Labels -->
-    <string name="select_all">Select all</string>
-    <string name="bold">Bold</string>
-    <string name="italic">Italic</string>
-    <string name="cut">Cut</string>
-    <string name="copy">Copy</string>
-    <string name="paste">Paste</string>
-    <string name="loading">Loading…</string>
-    <string name="failed_open">Failed to open file</string>
     <string name="failed_save">Failed to save</string>
-    <string name="find_prev">Prev</string>
-    <string name="find_next">Next</string>
 
     <!-- Format Button Confirmation Labels -->
-    <string name="format_confirm_title">Format script?</string>
-    <string name="format_confirm_yes">Format</string>
-    <string name="format_confirm_no">Cancel</string>
 
     <!-- Tutorial Button Labels -->
     <string name="title_tutorial">ChoiceScript Tutorial</string>

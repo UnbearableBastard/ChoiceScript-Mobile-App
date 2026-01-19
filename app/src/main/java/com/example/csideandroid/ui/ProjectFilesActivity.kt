@@ -580,8 +580,14 @@ class ProjectFilesActivity : AppCompatActivity() {
 
         val destRoot = File(filesDir, "runner/mygame")
         val destScenes = File(destRoot, "scenes")
+        val destImages = File(destRoot, "images")
         destRoot.deleteRecursively()
         destScenes.mkdirs()
+
+        fun isImageFile(name: String): Boolean {
+            val ext = name.substringAfterLast('.', "").lowercase()
+            return ext in setOf("png", "jpg", "jpeg", "gif", "webp", "svg")
+        }
 
         for (doc in srcScenes.listFiles().orEmpty()) {
             if (!doc.isFile) continue
@@ -589,6 +595,36 @@ class ProjectFilesActivity : AppCompatActivity() {
             val outFile = File(destScenes, name)
             contentResolver.openInputStream(doc.uri)?.use { input ->
                 FileOutputStream(outFile).use { output -> input.copyTo(output) }
+            }
+
+            // Convenience: if authors store images alongside their scene files and reference them as
+            // "*image foo.png" (no path), our engine will resolve that to images/foo.png.
+            // Copy any images found in the scenes folder into runner/mygame/images as well.
+            if (isImageFile(name)) {
+                destImages.mkdirs()
+                val imgOut = File(destImages, name)
+                contentResolver.openInputStream(doc.uri)?.use { input ->
+                    FileOutputStream(imgOut).use { output -> input.copyTo(output) }
+                }
+            }
+        }
+
+        // Copy images folder if present (ChoiceScript expects images to be referenced relative to mygame/index.html,
+        // commonly under "images/").
+        val imagesCandidates = listOfNotNull(
+            projectRoot.findFile("images"),
+            projectRoot.findFile("mygame")?.findFile("images")
+        )
+        val srcImages = imagesCandidates.firstOrNull { it.isDirectory }
+        if (srcImages != null) {
+            destImages.mkdirs()
+            for (doc in srcImages.listFiles().orEmpty()) {
+                if (!doc.isFile) continue
+                val name = doc.name ?: continue
+                val outFile = File(destImages, name)
+                contentResolver.openInputStream(doc.uri)?.use { input ->
+                    FileOutputStream(outFile).use { output -> input.copyTo(output) }
+                }
             }
         }
 

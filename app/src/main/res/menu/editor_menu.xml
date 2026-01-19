@@ -4,7 +4,8 @@
     <item
         android:id="@+id/action_theme"
         android:title="Theme"
-        android:icon="@android:drawable/ic_menu_manage"
-        app:showAsAction="always" />
+        android:icon="@drawable/ic_menu_24"
+        app:showAsAction="always"
+        app:iconTint="@android:color/white" />
 
 </menu>

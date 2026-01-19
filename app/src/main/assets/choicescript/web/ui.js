@@ -1139,6 +1139,14 @@ function printOptionButton(div, type, name, option, localChoiceNumber, globalCho
 
 function printImage(source, alignment, alt, invert) {
   var img = document.createElement("img");
+  // Android/WebView note:
+  // Many ChoiceScript projects keep image files under "images/" and reference them as
+  // "*image foo.png" (no path). In a WebView with a base URL of mygame/index.html,
+  // that would otherwise resolve to "./foo.png" and fail unless the image sits next to index.html.
+  // If the author provides no path (no '/'), assume "images/".
+  if (source && source.indexOf("/") === -1 && !/^(data:|https?:|file:)/i.test(source)) {
+    source = "images/" + source;
+  }
   if (typeof hashes != 'undefined' && hashes[source]) {
     source += "?hash=" + hashes[source];
   }

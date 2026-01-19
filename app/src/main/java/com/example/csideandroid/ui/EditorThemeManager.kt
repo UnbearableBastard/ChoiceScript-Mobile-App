@@ -42,6 +42,48 @@ object EditorThemeManager {
 
     private const val KEY_THEME = "editor_theme"
 
+    // User overrides for theme colors
+    private const val KEY_OVR_PREFIX = "theme_override_"
+
+    private fun ovrKey(theme: EditorTheme, field: String): String {
+        return KEY_OVR_PREFIX + theme.name + "_" + field
+    }
+
+    fun getColorsForSora(context: Context, theme: EditorTheme): EditorThemeColors {
+        val base = colorsFor(theme)
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+        fun getInt(field: String, fallback: Int): Int {
+            return if (prefs.contains(ovrKey(theme, field))) prefs.getInt(ovrKey(theme, field), fallback) else fallback
+        }
+
+        return base.copy(
+            background = getInt("background", base.background),
+            text = getInt("text", base.text),
+            lineNumber = getInt("lineNumber", base.lineNumber),
+            optionColor = getInt("optionColor", base.optionColor),
+            inlineVarColor = getInt("inlineVarColor", base.inlineVarColor),
+            defaultCommandColor = getInt("defaultCommandColor", base.defaultCommandColor)
+        )
+    }
+
+    fun saveThemeOverride(context: Context, theme: EditorTheme, field: String, color: Int) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit { putInt(ovrKey(theme, field), color) }
+    }
+
+    fun clearThemeOverrides(context: Context, theme: EditorTheme) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit {
+            remove(ovrKey(theme, "background"))
+            remove(ovrKey(theme, "text"))
+            remove(ovrKey(theme, "lineNumber"))
+            remove(ovrKey(theme, "optionColor"))
+            remove(ovrKey(theme, "inlineVarColor"))
+            remove(ovrKey(theme, "defaultCommandColor"))
+        }
+    }
+
     fun getCurrentTheme(context: Context): EditorTheme {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val name = prefs.getString(KEY_THEME, EditorTheme.CLASSIC.name) ?: EditorTheme.CLASSIC.name
@@ -194,10 +236,12 @@ object EditorThemeManager {
                 )
             }
 
-            // STAR WARS — IMPERIAL TERMINAL
+            // STAR WARS — Empire
             EditorTheme.STAR_WARS_EMPIRE -> {
                 val flow     = "#D21404".toColorInt() // Sith Red
-                val logic    = "#E0E0E0".toColorInt() // Imperial Grey
+                // Keep logic commands distinct from normal text.
+                // This theme previously used the same value as `text`, making *if/*else blend in.
+                val logic    = "#BFC5CA".toColorInt() // Imperial grey (darker than text)
                 val state    = "#9AA0A6".toColorInt() // Cold Steel
                 val input    = "#A81D1D".toColorInt() // Dark Red
                 val present  = "#5A6268".toColorInt() // Gunmetal
@@ -224,7 +268,8 @@ object EditorThemeManager {
             // DUNE — ARRAKIS
             EditorTheme.DUNE_ARRAKIS -> {
                 val flow     = "#FF8C2B".toColorInt() // spice orange
-                val logic    = "#EED7A1".toColorInt() // warm sand
+                // Keep logic commands distinct from normal text.
+                val logic    = "#405B8F".toColorInt() // arrakis blue
                 val state    = "#D5B887".toColorInt() // dune brown
                 val input    = "#C6711D".toColorInt() // deep spice
                 val present  = "#405B8F".toColorInt() // arrakis blue
@@ -251,7 +296,8 @@ object EditorThemeManager {
             // CYBERPUNK 2077 — NIGHT CITY
             EditorTheme.CYBERPUNK_NIGHTCITY -> {
                 val flow     = "#00F0FF".toColorInt() // neon cyan
-                val logic    = "#FDF700".toColorInt() // neon yellow
+                // Keep logic commands distinct from normal text.
+                val logic    = "#00F0FF".toColorInt() // neon cyan
                 val state    = "#FF00C8".toColorInt() // neon magenta
                 val input    = "#00C0A3".toColorInt() // neon teal
                 val present  = "#A700FF".toColorInt() // neon purple
@@ -276,7 +322,7 @@ object EditorThemeManager {
             }
 
 
-            // JEDI ORDER — TEMPLE ARCHIVES
+            // JEDI ORDER
             EditorTheme.JEDI_ORDER -> {
                 val flow     = "#4DA6FF".toColorInt() // Jedi blue
                 val logic    = "#D9B566".toColorInt() // soft gold
@@ -286,7 +332,7 @@ object EditorThemeManager {
                 val meta     = "#73C9FF".toColorInt() // saber-glow blue
 
                 EditorThemeColors(
-                    background = "#1C2635".toColorInt(), // Jedi Archives stone
+                    background = "#1C2635".toColorInt(), // Jedi Archives
                     text = "#E7ECF4".toColorInt(),
                     lineNumber = "#4B566A".toColorInt(),
                     optionColor = "#3C9DFF".toColorInt(),
@@ -333,7 +379,8 @@ object EditorThemeManager {
             // MASS EFFECT — N7 TACTICAL
             EditorTheme.MASS_EFFECT_N7 -> {
                 val flow     = "#D12A2A".toColorInt() // N7 red
-                val logic    = "#E6E6E6".toColorInt() // white trim
+                // Keep logic commands distinct from normal text.
+                val logic    = "#7FA8FF".toColorInt() // blue HUD
                 val state    = "#7FA8FF".toColorInt() // blue HUD
                 val input    = "#FF6B3A".toColorInt() // warning orange
                 val present  = "#999999".toColorInt() // gunmetal
@@ -441,7 +488,8 @@ object EditorThemeManager {
             // HARRY POTTER — SLYTHERIN
             EditorTheme.HP_SLYTHERIN -> {
                 val flow     = "#1E6F43".toColorInt() // green
-                val logic    = "#C9D6D5".toColorInt() // silver
+                // Keep logic commands distinct from normal text.
+                val logic    = "#9FB4B3".toColorInt() // silver (darker)
                 val state    = "#88C9A1".toColorInt()
                 val input    = "#2F8F5A".toColorInt()
                 val present  = "#9FB4B3".toColorInt()

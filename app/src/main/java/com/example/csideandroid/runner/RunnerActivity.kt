@@ -130,6 +130,9 @@ class RunnerActivity : AppCompatActivity() {
             "css" -> "text/css"
             "png" -> "image/png"
             "jpg", "jpeg" -> "image/jpeg"
+            "gif" -> "image/gif"
+            "webp" -> "image/webp"
+            "svg" -> "image/svg+xml"
             else -> MimeTypeMap.getSingleton()
                 .getMimeTypeFromExtension(ext)
                 ?: "application/octet-stream"
