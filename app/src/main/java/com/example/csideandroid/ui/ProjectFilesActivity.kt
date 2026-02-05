@@ -1,14 +1,21 @@
 package com.example.csideandroid.ui
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
+import android.webkit.JavascriptInterface
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.text.format.DateUtils
 import android.text.format.Formatter
 import android.view.ViewGroup
 import android.widget.EditText
+import android.widget.TextView
 import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -20,29 +27,57 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updateLayoutParams
 import androidx.documentfile.provider.DocumentFile
 import androidx.recyclerview.widget.ItemTouchHelper
-import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.csideandroid.R
 import com.example.csideandroid.runner.RunnerActivity
 import com.example.csideandroid.util.WordCountUtil
 import com.google.android.material.appbar.MaterialToolbar
+import androidx.webkit.WebViewAssetLoader
 import java.io.File
 import java.io.FileOutputStream
+import java.io.InputStream
 import java.text.NumberFormat
 import java.util.zip.CRC32
+import org.json.JSONArray
+import org.json.JSONObject
+import android.view.Menu
+import android.view.MenuItem
 
 private const val REQUEST_CREATE_SINGLE_HTML = 2002
 
 class ProjectFilesActivity : AppCompatActivity() {
 
+    private companion object {
+        // Unique id for programmatically-added overflow menu item
+        private const val MENU_UPLOAD_COGDEMOS = 16790001
+    }
+
+
     private lateinit var recycler: RecyclerView
     private lateinit var adapter: ProjectFilesAdapter
+    private lateinit var projectTitleView: TextView
 
     private var projectTree: DocumentFile? = null
     private var scenesDir: DocumentFile? = null
     private var cache: List<DocumentFile> = emptyList()
 
     private val prefs by lazy { getSharedPreferences("cside_prefs", MODE_PRIVATE) }
+
+    // --- Quicktest (ChoiceScript error checker) ---
+    private var quicktestWebView: WebView? = null
+    private var quicktestCallback: ((String?) -> Unit)? = null
+
+
+    // ---- Quicktest (collect-all) results ----
+    private data class QuicktestError(
+        val scene: String,
+        val line: Int,
+        val message: String
+    )
+
+    private var lastQuicktestErrors: List<QuicktestError>? = null
+
 
     private fun loadOrder(projectName: String): List<String> {
         val raw = prefs.getString("order_files_$projectName", "") ?: ""
@@ -82,12 +117,236 @@ class ProjectFilesActivity : AppCompatActivity() {
         startActivityForResult(createIntent, REQUEST_CREATE_SINGLE_HTML)
     }
 
+    private fun parseSceneListFromStartup(startupText: String): List<String> {
+        val lines = startupText.replace("\r", "").split("\n")
+        var idx = -1
+        for (i in lines.indices) {
+            if (lines[i].trimStart().startsWith("*scene_list", ignoreCase = true)) {
+                idx = i
+                break
+            }
+        }
+        if (idx == -1) return emptyList()
+
+        val scenes = mutableListOf<String>()
+        var expectedIndent: Int? = null
+        for (i in (idx + 1) until lines.size) {
+            val raw = lines[i]
+            if (raw.trim().isEmpty()) continue
+            val indent = raw.takeWhile { it == ' ' || it == '\t' }.length
+            if (indent == 0) break
+            if (expectedIndent == null) expectedIndent = indent
+            if (indent != expectedIndent) continue
+
+            var line = raw.trim()
+            // support "$product sceneName" format; we only need the sceneName
+            if (line.startsWith("$")) {
+                val parts = line.split(Regex("\\s+"), limit = 2)
+                if (parts.size == 2) line = parts[1].trim()
+            }
+            if (line.isNotBlank()) scenes.add(line)
+        }
+
+        // Ensure startup is first if scene_list omits it
+        val normalized = scenes.map { it.removeSuffix(".txt") }.toMutableList()
+        if (normalized.isEmpty()) return emptyList()
+        if (!normalized.first().equals("startup", ignoreCase = true)) {
+            if (normalized.none { it.equals("startup", ignoreCase = true) }) {
+                normalized.add(0, "startup")
+            } else {
+                // move startup to front
+                normalized.removeAll { it.equals("startup", ignoreCase = true) }
+                normalized.add(0, "startup")
+            }
+        }
+        return normalized
+    }
+
+    private fun readText(df: DocumentFile): String {
+        val ins: InputStream = contentResolver.openInputStream(df.uri) ?: return ""
+        return ins.use { String(it.readBytes()) }
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun runQuicktest(callback: (String?) -> Unit) {
+        val project = projectTree
+        val scenes = scenesDir
+        if (project == null || scenes == null) {
+            callback("No project selected.")
+            return
+        }
+
+        // Build { sceneNameWithoutExt : text }
+        val sceneMap = JSONObject()
+        val files = scenes.listFiles().filter { it.isFile && (it.name?.endsWith(".txt", true) == true) }
+        for (f in files) {
+            val name = (f.name ?: continue).removeSuffix(".txt")
+            sceneMap.put(name, readText(f))
+        }
+
+        val startup = sceneMap.optString("startup", "")
+        val sceneList = parseSceneListFromStartup(startup)
+        val sceneListJson = JSONArray()
+        for (s in sceneList) sceneListJson.put(s)
+
+        val payload = JSONObject().apply {
+            put("scenes", sceneMap)
+            put("sceneList", sceneListJson)
+        }
+
+        quicktestCallback = callback
+
+        val webView = WebView(this)
+        quicktestWebView = webView
+        webView.settings.javaScriptEnabled = true
+        webView.settings.domStorageEnabled = true
+
+        val assetLoader = WebViewAssetLoader.Builder()
+            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+            .build()
+
+        class QuicktestBridge {
+            @JavascriptInterface
+            fun onResult(resultJson: String) {
+                runOnUiThread {
+                    try {
+                        val obj = JSONObject(resultJson)
+
+                        val status = obj.optString("status")
+                        if (status == "OK") {
+                            lastQuicktestErrors = null
+                            quicktestCallback?.invoke(null)
+                        } else {
+                            // New method returns an "errors" array; fall back to "message" if not present.
+                            val arr = obj.optJSONArray("errors")
+                            if (arr != null) {
+                                val list = ArrayList<QuicktestError>(arr.length())
+                                for (i in 0 until arr.length()) {
+                                    val e = arr.optJSONObject(i) ?: continue
+                                    list.add(
+                                        QuicktestError(
+                                            scene = e.optString("scene"),
+                                            line = e.optInt("line", 0),
+                                            message = e.optString("message")
+                                        )
+                                    )
+                                }
+                                lastQuicktestErrors = list
+                                // Signal "there are errors" via non-null err, details are in lastQuicktestErrors
+                                quicktestCallback?.invoke("ERRORS")
+                            } else {
+                                lastQuicktestErrors = null
+                                quicktestCallback?.invoke(obj.optString("message"))
+                            }
+                        }
+                    } catch (e: Exception) {
+                        quicktestCallback?.invoke(resultJson)
+                    }
+                }
+            }
+        }
+
+        webView.addJavascriptInterface(QuicktestBridge(), "QuicktestBridge")
+        webView.webViewClient = object : WebViewClient() {
+            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+                return assetLoader.shouldInterceptRequest(request.url)
+            }
+
+            override fun onPageFinished(view: WebView, url: String) {
+                // Pass payload as a JSON string to avoid quoting issues.
+                val quoted = JSONObject.quote(payload.toString())
+                view.evaluateJavascript("window.runQuicktestCollectAll($quoted);", null)
+            }
+        }
+
+        // Load the checker wrapper HTML from assets
+        webView.loadUrl("https://appassets.androidplatform.net/assets/choicescript/checker/quicktest_checker.html")
+    }
+
+
+
+
+    private fun showQuicktestErrorsDialog(errors: List<QuicktestError>) {
+        // Clear stored list so future runs don't accidentally reuse it
+        lastQuicktestErrors = null
+
+        var dialog: androidx.appcompat.app.AlertDialog? = null
+
+        fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+
+        val scroll = android.widget.ScrollView(this)
+        val container = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+        }
+        scroll.addView(container)
+
+        errors.forEachIndexed { index, e ->
+            val row = android.widget.LinearLayout(this).apply {
+                orientation = android.widget.LinearLayout.HORIZONTAL
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            }
+
+            val textBox = android.widget.TextView(this).apply {
+                val sceneTitle = if (e.scene.endsWith(".txt", ignoreCase = true)) e.scene else "${e.scene}.txt"
+                val linePart = if (e.line > 0) " — line ${e.line}" else ""
+                text = """
+                ${index + 1}) $sceneTitle$linePart
+                ${e.message}
+                """.trimIndent()
+                setPadding(0, 0, dp(12), 0)
+                layoutParams = android.widget.LinearLayout.LayoutParams(0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+
+            val btn = android.widget.Button(this).apply {
+                text = "Go to"
+                isAllCaps = false
+                setOnClickListener {
+                    dialog?.dismiss()
+                    openSceneAndJump(e.scene, e.line)
+                }
+            }
+
+            row.addView(textBox)
+            row.addView(btn)
+            container.addView(row)
+
+            if (index != errors.lastIndex) {
+                val divider = android.view.View(this).apply {
+                    layoutParams = android.widget.LinearLayout.LayoutParams(
+                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                        dp(1)
+                    ).apply {
+                        topMargin = dp(10)
+                        bottomMargin = dp(10)
+                    }
+                    setBackgroundColor(android.graphics.Color.parseColor("#22000000"))
+                }
+                container.addView(divider)
+            }
+        }
+
+        dialog = androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Errors (${errors.size})")
+            .setView(scroll)
+            .setPositiveButton("Close", null)
+            .create()
+
+        dialog?.show()
+    }
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.statusBarColor = Color.TRANSPARENT
 
         setContentView(R.layout.activity_project_files)
+
+        projectTitleView = findViewById(R.id.projectTitle)
 
         val spacer = findViewById<android.view.View>(R.id.statusBarSpacer)
         ViewCompat.setOnApplyWindowInsetsListener(spacer) { v, insets ->
@@ -101,14 +360,19 @@ class ProjectFilesActivity : AppCompatActivity() {
 
         toolbar.inflateMenu(R.menu.menu_project_files)
 
+        // Add overflow menu item to open CoG Demos upload page
+        toolbar.menu.add(Menu.NONE, MENU_UPLOAD_COGDEMOS, Menu.NONE, "Upload to CoG Demos")
+            .setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
+
+
         toolbar.menu.findItem(R.id.action_new_txt).actionView
             ?.findViewById<android.widget.Button>(R.id.btnNewFile)
             ?.setOnClickListener { promptNewFile() }
 
-        toolbar.navigationIcon = AppCompatResources.getDrawable(
-            this,
-            androidx.appcompat.R.drawable.abc_ic_ab_back_material
-        )
+        AppCompatResources.getDrawable(this, R.drawable.ic_arrow_back_24)?.let { d ->
+            d.setTint(Color.WHITE)
+            toolbar.navigationIcon = d
+        }
         toolbar.navigationIcon?.setTint(Color.WHITE)
         toolbar.setNavigationOnClickListener { finish() }
 
@@ -121,6 +385,14 @@ class ProjectFilesActivity : AppCompatActivity() {
 
         toolbar.setOnMenuItemClickListener { item ->
             when (item.itemId) {
+                MENU_UPLOAD_COGDEMOS -> {
+                    try {
+                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://cogdemos.ink/")))
+                    } catch (t: Throwable) {
+                        Toast.makeText(this, "No browser found to open CoG Demos.", Toast.LENGTH_SHORT).show()
+                    }
+                    true
+                }
                 R.id.action_run -> {
                     copyProjectToRunner()
                     startActivity(Intent(this, RunnerActivity::class.java))
@@ -128,6 +400,30 @@ class ProjectFilesActivity : AppCompatActivity() {
                 }
                 R.id.action_compile_html -> {
                     promptCompileToSingleHtml()
+                    true
+                }
+                R.id.action_quicktest -> {
+                    runQuicktest { err ->
+                        // Cleanup hidden WebView
+                        quicktestWebView?.destroy()
+                        quicktestWebView = null
+
+
+                        if (err == null) {
+                            Toast.makeText(this, "Quicktest passed (no errors).", Toast.LENGTH_SHORT).show()
+                        } else {
+                            val errs = lastQuicktestErrors
+                            if (errs != null && errs.isNotEmpty()) {
+                                showQuicktestErrorsDialog(errs)
+                            } else {
+                                AlertDialog.Builder(this)
+                                    .setTitle("Quicktest Error")
+                                    .setMessage(err)
+                                    .setPositiveButton("OK", null)
+                                    .show()
+                            }
+                        }
+                    }
                     true
                 }
                 else -> false
@@ -152,11 +448,19 @@ class ProjectFilesActivity : AppCompatActivity() {
             insets
         }
 
-        recycler.layoutManager = LinearLayoutManager(this)
+        val smallestWidthDp = resources.configuration.smallestScreenWidthDp
+        val span = when {
+            smallestWidthDp >= 900 -> 3
+            smallestWidthDp >= 600 -> 2
+            else -> 1
+        }
+        recycler.layoutManager = GridLayoutManager(this, span)
 
         val uriStr = intent.getStringExtra("extra_project_uri") ?: run { finish(); return }
         projectTree = DocumentFile.fromTreeUri(this, Uri.parse(uriStr))
         scenesDir = resolveScenes(projectTree!!)
+
+        projectTitleView.text = projectTree?.name ?: ""
 
         adapter = ProjectFilesAdapter(
             metaProvider = { f -> metaFor(f) },
@@ -164,7 +468,8 @@ class ProjectFilesActivity : AppCompatActivity() {
             onRename = { rename(it) },
             onDelete = { delete(it) },
             isProtected = {
-                it.name.equals("startup.txt", true) ||
+                isImageFile(it) ||
+                        it.name.equals("startup.txt", true) ||
                         it.name.equals("choicescript_stats.txt", true)
             }
         )
@@ -173,10 +478,22 @@ class ProjectFilesActivity : AppCompatActivity() {
         loadFiles()
 
         val touchHelper = ItemTouchHelper(object :
-            ItemTouchHelper.SimpleCallback(
-                ItemTouchHelper.UP or ItemTouchHelper.DOWN,
-                0
-            ) {
+            ItemTouchHelper.SimpleCallback(0, 0) {
+
+
+            override fun getMovementFlags(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder
+            ): Int {
+                val lm = recyclerView.layoutManager
+                val dragFlags =
+                    if (lm is GridLayoutManager) {
+                        ItemTouchHelper.UP or ItemTouchHelper.DOWN or ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT
+                    } else {
+                        ItemTouchHelper.UP or ItemTouchHelper.DOWN
+                    }
+                return makeMovementFlags(dragFlags, 0)
+            }
 
             override fun onMove(rv: RecyclerView, vh: RecyclerView.ViewHolder, tgt: RecyclerView.ViewHolder): Boolean {
                 val from = vh.bindingAdapterPosition
@@ -309,14 +626,72 @@ class ProjectFilesActivity : AppCompatActivity() {
 
     private fun mapDoc(fake: File) = cache.firstOrNull { it.name == fake.name }
 
+
+    private fun isImageFile(f: File): Boolean {
+        val ext = f.name.substringAfterLast('.', "").lowercase()
+        return ext in setOf(
+            "png","jpg","jpeg","webp","gif","bmp",
+            "tga","tif","tiff","svg","heic","heif","avif"
+        )
+    }
+
     private fun openTxt(fake: File) {
+        if (isImageFile(fake)) {
+            android.widget.Toast.makeText(this, "Image files can\'t be opened in the editor.", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
         val doc = mapDoc(fake) ?: return
+        val projectUriStr = projectTree?.uri?.toString()
         startActivity(
             Intent(this, EditorActivityV3::class.java)
                 .putExtra("extra_document_uri", doc.uri.toString())
                 .putExtra("extra_display_name", doc.name)
+                .apply {
+                    // Needed so the editor's Quicktest (error checker) can run against the project.
+                    // ProjectFilesActivity already has the selected SAF tree; pass it through.
+                    if (!projectUriStr.isNullOrBlank()) {
+                        putExtra("extra_project_uri", projectUriStr)
+                    }
+                }
         )
     }
+
+
+    private fun openSceneAndJump(sceneName: String, lineOneBased: Int) {
+        val proj = projectTree ?: return
+        val scenes = scenesDir ?: resolveScenes(proj) ?: proj
+
+        val wanted = if (sceneName.endsWith(".txt", ignoreCase = true)) sceneName else "$sceneName.txt"
+
+        // Find the scene file under scenes directory first, fallback to anywhere under project tree.
+        fun findIn(dir: DocumentFile): DocumentFile? {
+            dir.listFiles().forEach { f ->
+                if (f.isFile && f.name.equals(wanted, ignoreCase = true)) return f
+            }
+            return null
+        }
+
+        var doc: DocumentFile? = findIn(scenes)
+        if (doc == null && scenes != proj) doc = findIn(proj)
+
+        if (doc == null) {
+            android.widget.Toast.makeText(this, "Couldn't find scene: $wanted", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val projectUriStr = proj.uri.toString()
+        val intent = Intent(this, EditorActivityV3::class.java)
+            .putExtra("extra_document_uri", doc!!.uri.toString())
+            .putExtra("extra_display_name", doc!!.name)
+            .putExtra("extra_project_uri", projectUriStr)
+
+        if (lineOneBased > 0) {
+            intent.putExtra("extra_goto_line_1based", lineOneBased)
+        }
+        startActivity(intent)
+    }
+
+
 
     private fun rename(fake: File) {
         val doc = mapDoc(fake) ?: return
@@ -598,7 +973,7 @@ class ProjectFilesActivity : AppCompatActivity() {
             }
 
             // Convenience: if authors store images alongside their scene files and reference them as
-            // "*image foo.png" (no path), our engine will resolve that to images/foo.png.
+            // "*image example.png" (no path), the engine will resolve that to images/example.png.
             // Copy any images found in the scenes folder into runner/mygame/images as well.
             if (isImageFile(name)) {
                 destImages.mkdirs()

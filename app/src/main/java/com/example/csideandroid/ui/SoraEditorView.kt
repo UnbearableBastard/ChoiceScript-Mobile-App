@@ -139,20 +139,31 @@ class SoraEditorView @JvmOverloads constructor(
         val lastWs = max(beforeCursor.lastIndexOf(' '), beforeCursor.lastIndexOf('\t'))
         val token = beforeCursor.substring(lastWs + 1)
 
-        if (!token.startsWith("*")) {
+        if (!(token.startsWith("*") || token.startsWith("$"))) {
             commandPopup.dismiss()
             return
         }
 
-        val typed = token.substring(1).lowercase() // chars after '*'
+        val isStar = token.startsWith("*")
+        val isDollar = token.startsWith("$")
+
+        val typed = token.substring(1).lowercase() // chars after trigger
 
         // Filter matches
-        val matches = commandsList
-            .asSequence()
-            .filter { typed.isEmpty() || it.startsWith(typed) }
-            .take(200)
-            .map { "*$it" }
-            .toList()
+        val matches: List<String> = if (isStar) {
+            commandsList
+                .asSequence()
+                .filter { typed.isEmpty() || it.startsWith(typed) }
+                .take(200)
+                .map { "*$it" }
+                .toList()
+        } else {
+            val exprs = listOf("\${}", "\$!{}")
+            exprs
+                .asSequence()
+                .filter { typed.isEmpty() || it.substring(1).startsWith(typed) }
+                .toList()
+        }
 
         if (matches.isEmpty()) {
             commandPopup.dismiss()
@@ -281,18 +292,34 @@ class SoraEditorView @JvmOverloads constructor(
 
         val lastWs = max(beforeCursor.lastIndexOf(' '), beforeCursor.lastIndexOf('\t'))
         val token = beforeCursor.substring(lastWs + 1)
-        if (!token.startsWith("*")) return
+        if (!(token.startsWith("*") || token.startsWith("$"))) return
 
-        val already = token.substring(1) // what user typed after '*'
-        val suffix = if (selected.startsWith(already, ignoreCase = true)) {
-            selected.substring(already.length)
-        } else {
-            // If mismatch, insert full command text after *
-            selected
-        }
+        if (token.startsWith("*")) {
+            val chosen = selectedWithStar.removePrefix("*")
+            val already = token.substring(1) // what user typed after '*'
+            val suffix = if (chosen.startsWith(already, ignoreCase = true)) {
+                chosen.substring(already.length)
+            } else {
+                // If mismatch, insert full command text after *
+                chosen
+            }
 
-        if (suffix.isNotEmpty()) {
-            editor.insertText(suffix, suffix.length)
+            if (suffix.isNotEmpty()) {
+                editor.insertText(suffix, suffix.length)
+            }
+        } else if (token.startsWith("$")) {
+            val chosen = selectedWithStar // keep leading '$' (e.g., ${} or $!{})
+            val chosenAfter = chosen.removePrefix("$")
+            val alreadyAfter = token.substring(1) // what user typed after '$'
+            val suffix = if (chosenAfter.startsWith(alreadyAfter, ignoreCase = true)) {
+                chosenAfter.substring(alreadyAfter.length)
+            } else {
+                chosenAfter
+            }
+
+            if (suffix.isNotEmpty()) {
+                editor.insertText(suffix, suffix.length)
+            }
         }
     }
 
@@ -532,4 +559,65 @@ class SoraEditorView @JvmOverloads constructor(
     fun focusEditor() {
         editor.requestFocus()
     }
+
+
+    fun goToLine(line0Based: Int, column0Based: Int = 0) {
+        val ln = line0Based.coerceAtLeast(0)
+        val col = column0Based.coerceAtLeast(0)
+        editor.post {
+            runCatching {
+                editor.setSelection(ln, col)
+                editor.requestFocus()
+            }
+        }
+    }
+
+
+    fun toggleBold() {
+        wrapSelectionWithTags("[b]", "[/b]")
+    }
+
+    fun toggleItalic() {
+        wrapSelectionWithTags("[i]", "[/i]")
+    }
+
+    private fun wrapSelectionWithTags(openTag: String, closeTag: String) {
+        editor.requestFocus()
+
+        val cursor = editor.cursor
+        val lLine = cursor.leftLine
+        val lCol = cursor.leftColumn
+        val rLine = cursor.rightLine
+        val rCol = cursor.rightColumn
+
+        // Determine ordered start/end
+        val startIsLeft = (lLine < rLine) || (lLine == rLine && lCol <= rCol)
+        val startLine = if (startIsLeft) lLine else rLine
+        val startCol = if (startIsLeft) lCol else rCol
+        val endLine = if (startIsLeft) rLine else lLine
+        val endCol = if (startIsLeft) rCol else lCol
+
+        val hasSelection = (startLine != endLine) || (startCol != endCol)
+
+        runCatching {
+            editor.text.beginBatchEdit()
+
+            if (!hasSelection) {
+                // Insert both tags at cursor and place caret between them
+                editor.text.insert(startLine, startCol, openTag + closeTag)
+                editor.setSelection(startLine, startCol + openTag.length)
+            } else {
+                // Insert close tag at end first so start position remains valid
+                editor.text.insert(endLine, endCol, closeTag)
+                editor.text.insert(startLine, startCol, openTag)
+
+                // Place caret after the closing tag
+                val shiftedEndCol = endCol + closeTag.length + if (endLine == startLine) openTag.length else 0
+                editor.setSelection(endLine, shiftedEndCol)
+            }
+        }.also {
+            editor.text.endBatchEdit()
+        }
+    }
+
 }

@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.text.format.DateUtils
 import android.view.View
+import android.view.MotionEvent
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -13,6 +14,12 @@ import androidx.documentfile.provider.DocumentFile
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
+import android.net.Uri
+import android.widget.ImageButton
+import android.widget.CheckBox
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import androidx.activity.result.contract.ActivityResultContracts
 import com.example.csideandroid.R
 import com.example.csideandroid.storage.StorageAccess
 import com.example.csideandroid.util.WordCountUtil
@@ -25,10 +32,49 @@ import java.util.concurrent.Executors
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import androidx.core.content.edit
+import android.transition.TransitionManager
+import android.view.ViewGroup
 
 class ProjectsBrowserActivity : AppCompatActivity() {
 
     private val prefs by lazy { getSharedPreferences("cside_prefs", MODE_PRIVATE) }
+
+
+    private var helpDialog: AlertDialog? = null
+    private val PREF_HIDE_HELP_POPUP = "hide_help_popup"
+
+    private val pickBase =
+        registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
+            if (uri != null) {
+
+                // Same persistable-permission approach as FirstRunActivity
+                val flags =
+                    (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+
+                try {
+                    contentResolver.takePersistableUriPermission(uri, flags)
+                } catch (_: Exception) {
+                    // Some OEMs may throw even when permission is effectively OK — ignore
+                }
+
+                val picked = DocumentFile.fromTreeUri(this, uri)
+
+                // If user picked the "Choicescript Projects" folder itself, use it directly
+                val projects = if (picked?.name == "Choicescript Projects") {
+                    picked
+                } else {
+                    picked?.findFile("Choicescript Projects")
+                        ?: picked?.createDirectory("Choicescript Projects")
+                }
+
+                if (projects != null) {
+                    StorageAccess.setProjectsRoot(this, projects.uri)
+                    reload()
+                } else {
+                    Toast.makeText(this, "Unable to access selected folder.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
 
     // ORDER PERSISTENCE HELPERS
 
@@ -91,14 +137,191 @@ class ProjectsBrowserActivity : AppCompatActivity() {
     private var currentRecent: List<File> = emptyList()
     private var currentAll: List<File> = emptyList()
 
+
+    private var isSideMenuOpen: Boolean = false
+    private var pendingCloseOnUp: Boolean = false
+    private var isDraggingMenu: Boolean = false
+    private var dragStartX: Float = 0f
+    private var dragStartWidth: Int = 0
+    private var dragMoved: Boolean = false
+
+    private val sideMenuMaxWidthPx: Int by lazy { dp(220) }
+    private val sideMenuEdgePx: Int by lazy { dp(24) }
+    private val sideMenuDragSlopPx: Int by lazy { dp(4) }
+
+    private lateinit var menuScrim: View
+
+    private fun toggleSideMenu() {
+        setSideMenuOpen(!isSideMenuOpen)
+    }
+
+    private fun setSideMenuWidthPx(widthPx: Int, animate: Boolean) {
+        val root = findViewById<ViewGroup>(R.id.rootProjectsBrowser)
+        val menu = findViewById<View>(R.id.sideMenu)
+
+        if (animate) {
+            TransitionManager.beginDelayedTransition(root)
+        }
+
+        val lp = menu.layoutParams
+        lp.width = widthPx.coerceIn(0, sideMenuMaxWidthPx)
+        menu.layoutParams = lp
+
+        // Keep the scrim *outside* the menu so menu buttons remain clickable.
+        (menuScrim.layoutParams as? ViewGroup.MarginLayoutParams)?.let { slp ->
+            slp.marginStart = lp.width
+            menuScrim.layoutParams = slp
+        }
+
+        // Show scrim whenever the menu is visible (even partially during drag).
+        menuScrim.visibility = if (lp.width > 0) View.VISIBLE else View.GONE
+    }
+
+    private fun setSideMenuOpen(open: Boolean) {
+        setSideMenuWidthPx(if (open) sideMenuMaxWidthPx else 0, animate = true)
+        isSideMenuOpen = open
+    }
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
+
+    private fun handleSideMenuTouch(ev: MotionEvent): Boolean {
+        val root = findViewById<View>(R.id.rootProjectsBrowser)
+        val menu = findViewById<View>(R.id.sideMenu)
+
+        val loc = IntArray(2)
+        root.getLocationOnScreen(loc)
+        val x = ev.rawX - loc[0]
+
+        val currentWidth = menu.layoutParams.width.coerceAtLeast(0)
+        val menuVisible = currentWidth > 0
+
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                dragStartX = x
+                dragStartWidth = currentWidth
+                dragMoved = false
+                pendingCloseOnUp = false
+                isDraggingMenu = false
+
+                // If menu is closed, only start gesture from the left edge.
+                if (!menuVisible) {
+                    if (x <= sideMenuEdgePx) {
+                        isDraggingMenu = true
+                        // Make scrim visible immediately so taps/drags are captured.
+                        menuScrim.visibility = View.VISIBLE
+                        return true
+                    }
+                    return false
+                }
+
+                // Menu is visible: tap outside closes; drag can start from menu or edge.
+                if (x > currentWidth) {
+                    pendingCloseOnUp = true
+                    return true
+                }
+
+                // Start drag from within menu (or edge) to allow closing by swiping left.
+                isDraggingMenu = true
+                return true
+            }
+
+            MotionEvent.ACTION_MOVE -> {
+                if (!isDraggingMenu) return pendingCloseOnUp
+
+                val dx = x - dragStartX
+                if (!dragMoved && kotlin.math.abs(dx) >= sideMenuDragSlopPx) {
+                    dragMoved = true
+                    pendingCloseOnUp = false
+                }
+
+                val newWidth = (dragStartWidth + dx).toInt()
+                setSideMenuWidthPx(newWidth, animate = false)
+                return true
+            }
+
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                if (isDraggingMenu) {
+                    val w = menu.layoutParams.width.coerceAtLeast(0)
+                    val shouldOpen = w >= (sideMenuMaxWidthPx / 2)
+                    setSideMenuOpen(shouldOpen)
+                    isDraggingMenu = false
+                    pendingCloseOnUp = false
+                    return true
+                }
+
+                if (pendingCloseOnUp) {
+                    setSideMenuOpen(false)
+                    pendingCloseOnUp = false
+                    return true
+                }
+
+                return false
+            }
+        }
+
+        return false
+    }
+
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_projects_browser)
 
+        // Side menu scrim + edge drag / tap-to-close handling
+        menuScrim = findViewById(R.id.menuScrim)
+        val rootTouchTarget = findViewById<View>(R.id.rootProjectsBrowser)
+        val menuTouchListener = View.OnTouchListener { _, ev -> handleSideMenuTouch(ev) }
+        rootTouchTarget.setOnTouchListener(menuTouchListener)
+        menuScrim.setOnTouchListener(menuTouchListener)
+        findViewById<View>(R.id.leftEdgeGrabber).setOnTouchListener(menuTouchListener)
+        // Keep scrim in sync with the initial menu state
+        setSideMenuWidthPx(findViewById<View>(R.id.sideMenu).layoutParams.width, animate = false)
+
+
+        // Side menu (collapsible) toggle
+        findViewById<View>(R.id.btnMenuToggle).setOnClickListener {
+            toggleSideMenu()
+        }
+
+
+
+        findViewById<View>(R.id.btnRelocate).setOnClickListener {
+            pickBase.launch(null)
+        }
         pinnedGrid = findViewById(R.id.recyclerPinned)
         recentGrid = findViewById(R.id.recyclerRecent)
         allGrid = findViewById(R.id.recyclerAll)
         emptyView = findViewById(R.id.txtEmptyProjects)
+
+        // Section header buttons: tap to collapse/expand each list
+        val btnPinnedHeader = findViewById<View>(R.id.txtPinnedHeader)
+        val btnRecentHeader = findViewById<View>(R.id.txtRecentHeader)
+        val btnAllHeader = findViewById<View>(R.id.txtAllHeader)
+
+        fun applyCollapsed(prefKey: String, header: View, list: View) {
+            val collapsed = prefs.getBoolean(prefKey, false)
+            list.visibility = if (collapsed) View.GONE else View.VISIBLE
+            header.alpha = if (collapsed) 0.72f else 1.0f
+        }
+
+        fun wireCollapse(prefKey: String, header: View, list: View) {
+            header.setOnClickListener {
+                val collapseNow = list.visibility == View.VISIBLE
+                list.visibility = if (collapseNow) View.GONE else View.VISIBLE
+                header.alpha = if (collapseNow) 0.72f else 1.0f
+                prefs.edit { putBoolean(prefKey, collapseNow) }
+            }
+        }
+
+        applyCollapsed("collapse_pinned", btnPinnedHeader, pinnedGrid)
+        applyCollapsed("collapse_recent", btnRecentHeader, recentGrid)
+        applyCollapsed("collapse_all", btnAllHeader, allGrid)
+
+        wireCollapse("collapse_pinned", btnPinnedHeader, pinnedGrid)
+        wireCollapse("collapse_recent", btnRecentHeader, recentGrid)
+        wireCollapse("collapse_all", btnAllHeader, allGrid)
 
         val smallestWidthDp = resources.configuration.smallestScreenWidthDp
         val span = when {
@@ -150,6 +373,12 @@ class ProjectsBrowserActivity : AppCompatActivity() {
             startActivity(Intent(this, TutorialActivity::class.java))
         }
 
+        findViewById<View>(R.id.btnHelp)?.setOnClickListener {
+            // Always allow opening Help, even if the user previously selected "Do not show again".
+            showHelpPopup(force = true)
+            setSideMenuOpen(false)
+        }
+
         findViewById<View>(R.id.btnNewProject)?.setOnClickListener {
             promptNewProject()
         }
@@ -158,10 +387,110 @@ class ProjectsBrowserActivity : AppCompatActivity() {
 
 
 
+    override fun onResume() {
+        super.onResume()
+        // Show the help popup every time unless the user opted out.
+        showHelpPopup(force = false)
+    }
+
+
+
     override fun onDestroy() {
         super.onDestroy()
         projectMetaExecutor.shutdownNow()
     }
+
+    private fun showHelpPopup(force: Boolean) {
+        if (!force && prefs.getBoolean(PREF_HIDE_HELP_POPUP, false)) return
+        if (helpDialog?.isShowing == true) return
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(18), dp(18), dp(8))
+        }
+
+        val message = """Welcome to the ChoiceScript Android Editor!
+
+This app helps you manage your ChoiceScript projects and playtest them before publishing.
+
+Getting started
+    • Use the hamburger (side menu) to create a new project or paste an existing project into the newly created "ChoiceScript Projects" folder.
+    
+    • Within the menu, there is a basic tutorial on ChoiceScript for beginners. Just click the "Tutorial" button.
+    
+    • If you've reinstalled this and accidentally selected the wrong section or folder. Tap the "Reselect" button.
+    
+    • From the project browser menu, you can delete, rename and upload your project to your preferred cloud storage.
+    
+    • If you've selected the "Do not show again" prompt at the bottom of this menu and want to view it again, select the "Help" button.
+
+
+Project sections: These sections are all collapsible to help reduce clutter. Just tap them and if you want to rearrange the project cards within, just hold and drag them.
+
+    • Pinned: pin your most-used projects so they stay at the top.
+    
+    • Recent: shows projects you opened most recently.
+    
+    • All Projects: everything in your ChoiceScript Project folder.
+
+
+Editor & Error Checker
+    • Use the Quicktest/Error Checker buttons to find any errors in your code. It can be used within the editor by selecting the button with the paper icon and also in the file browser menu by selecting the three dots.
+    
+    • Important: The Error Checker collects errors from the files listed in *scene_list, and because it scans across many files, it can sometimes report false positives.
+ 
+    • Best practice is to fix the errors in the order they appear in the Error menu as later errors often disappear after the earlier ones are corrected if they were false positives.
+    
+    • For example, if your *choice is spelt incorrectly or the indent is wrong, then all of the nested text and choices within the *choice will throw errors at the Quicktest.
+    
+    • The themes in the editor are customizable, you can tap and hold the top bar above the editor to open the "Edit Theme" menu.
+  
+""".trimIndent()
+
+        val tv = TextView(this).apply {
+            text = message
+            textSize = 15f
+        }
+
+        val scroll = ScrollView(this).apply {
+            addView(
+                tv,
+                ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            )
+        }
+
+        val cb = CheckBox(this).apply {
+            text = "Do not show again"
+            isChecked = prefs.getBoolean(PREF_HIDE_HELP_POPUP, false)
+            setPadding(0, dp(12), 0, 0)
+        }
+
+        container.addView(
+            scroll,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+        )
+        container.addView(cb)
+
+        helpDialog = AlertDialog.Builder(this)
+            .setTitle("Help")
+            .setView(container)
+            .setPositiveButton("OK") { d, _ -> d.dismiss() }
+            .setOnDismissListener {
+                // Persist the checkbox state every time the dialog closes.
+                prefs.edit { putBoolean(PREF_HIDE_HELP_POPUP, cb.isChecked) }
+            }
+            .create()
+
+        helpDialog?.show()
+    }
+
 
     // META SYSTEM
 
@@ -247,13 +576,13 @@ class ProjectsBrowserActivity : AppCompatActivity() {
 
         val all = applyOrder(rawAll, savedAll)
 
-        currentAll = all
-        currentPinned = pinned
-        currentRecent = recent
+        currentAll = ArrayList(all)
+        currentPinned = ArrayList(pinned)
+        currentRecent = ArrayList(recent)
 
-        pinnedAdapter.update(pinned)
-        recentAdapter.update(recent)
-        allAdapter.update(all)
+        pinnedAdapter.update(currentPinned)
+        recentAdapter.update(currentRecent)
+        allAdapter.update(currentAll)
 
         emptyView.visibility = if (rawAll.isEmpty()) View.VISIBLE else View.GONE
     }
@@ -262,7 +591,7 @@ class ProjectsBrowserActivity : AppCompatActivity() {
 
     private fun setupDragAndDrop() {
 
-        // ---- PINNED ----
+        // PINNED
         val pinnedCallback = object : ItemTouchHelper.SimpleCallback(
             ItemTouchHelper.UP or ItemTouchHelper.DOWN or ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT,
             0
@@ -274,12 +603,13 @@ class ProjectsBrowserActivity : AppCompatActivity() {
                 val to = target.bindingAdapterPosition
                 if (from !in currentPinned.indices || to !in currentPinned.indices) return false
 
-                val list = currentPinned.toMutableList()
+                val list = (currentPinned as? MutableList<File>)
+                    ?: ArrayList(currentPinned).also { currentPinned = it; pinnedAdapter.update(it) }
+
                 val item = list.removeAt(from)
                 list.add(to, item)
 
-                currentPinned = list
-                pinnedAdapter.update(list)
+                pinnedAdapter.notifyItemMoved(from, to)
                 saveOrder("order_pinned", list) // SAVE ORDER
                 return true
             }
@@ -301,13 +631,14 @@ class ProjectsBrowserActivity : AppCompatActivity() {
                 val to = tgt.bindingAdapterPosition
                 if (from !in currentRecent.indices || to !in currentRecent.indices) return false
 
-                val list = currentRecent.toMutableList()
+                val list = (currentRecent as? MutableList<File>)
+                    ?: ArrayList(currentRecent).also { currentRecent = it; recentAdapter.update(it) }
+
                 val item = list.removeAt(from)
                 list.add(to, item)
 
-                currentRecent = list
-                recentAdapter.update(list)
-                saveOrder("order_recent", list) // SAVE
+                recentAdapter.notifyItemMoved(from, to)
+                saveOrder("order_recent", list) // SAVE ORDER
                 return true
             }
 
@@ -328,13 +659,14 @@ class ProjectsBrowserActivity : AppCompatActivity() {
                 val to = tgt.bindingAdapterPosition
                 if (from !in currentAll.indices || to !in currentAll.indices) return false
 
-                val list = currentAll.toMutableList()
+                val list = (currentAll as? MutableList<File>)
+                    ?: ArrayList(currentAll).also { currentAll = it; allAdapter.update(it) }
+
                 val item = list.removeAt(from)
                 list.add(to, item)
 
-                currentAll = list
-                allAdapter.update(list)
-                saveOrder("order_all", list) // SAVE
+                allAdapter.notifyItemMoved(from, to)
+                saveOrder("order_all", list) // SAVE ORDER
                 return true
             }
 

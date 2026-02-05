@@ -28,8 +28,11 @@ class FirstRunActivity : AppCompatActivity() {
 
                 // Find or create the "Choicescript Projects" directory
                 val picked = DocumentFile.fromTreeUri(this, uri)
-                val projects = picked?.findFile("Choicescript Projects")
-                    ?: picked?.createDirectory("Choicescript Projects")
+                val projects = if (picked?.name == "Choicescript Projects") {
+                    picked
+                } else {
+                    picked?.findFile("Choicescript Projects") ?: picked?.createDirectory("Choicescript Projects")
+                }
 
                 if (projects != null) {
                     StorageAccess.setProjectsRoot(this, projects.uri)

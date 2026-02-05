@@ -1,0 +1,326 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ChoiceScript Quicktest Checker</title>
+</head>
+<body>
+<script>
+    // Minimal stubs expected by ChoiceScript web engine
+    window.isMobile = true;
+    window.isWeb = false;
+    window.isFile = false;
+    window.printImage = function(source, alignment, alt, invert) { /* no-op */ };
+
+    // IMPORTANT: ChoiceScript engine expects a global "stats" object in web mode.
+    // Define it BEFORE loading util/navigator/scene.
+    window.stats = window.stats || {};
+    // Some engine code references bare `stats` (not `window.stats`)
+    var stats = window.stats;
+
+    // scene.js calls these when loading scenes in web mode; we override loadScene anyway.
+    window.startLoading = function() {};
+    window.doneLoading = function() {};
+
+    // Used by some error paths
+    window.reportError = function(msg) {
+      throw new Error(msg);
+    };
+
+    // Default print functions; embeddable-autotester will overwrite some of these too.
+    window.printx = window.printParagraph = window.printLine = window.printFooter = function() {};
+    window.clearScreen = function(cb) { if (cb) cb(); };
+</script>
+
+<script src="util.js"></script>
+<script src="navigator.js"></script>
+<script src="scene.js"></script>
+
+<!-- ChoiceScript's editor autotester (Quicktest core) -->
+<script src="embeddable-autotester.js"></script>
+
+<script>
+    // Injected by Android via evaluateJavascript:
+    // window.__CS_SCENES = { "startup": "...", "chapter1": "..." }
+
+    function _safeString(x) {
+      if (typeof x === 'string') return x;
+      if (x === null || x === undefined) return '';
+      return String(x);
+    }
+
+    function _getSceneText(name) {
+      if (!window.__CS_SCENES) return null;
+      return window.__CS_SCENES[name] ?? window.__CS_SCENES[name + '.txt'] ?? null;
+    }
+
+    // Override scene loading to pull from injected in-memory map.
+    Scene.prototype.loadScene = function() {
+      if (this.loading) return;
+      this.loading = true;
+
+      var txt = _getSceneText(this.name);
+      if (txt === null || txt === undefined) {
+        throw new Error(this.lineMsg() + "Couldn't load scene file: " + this.name + ".txt\nThe file is probably missing or empty.");
+      }
+
+      txt = txt.replace(/\r/g, "");
+      this.loading = false;
+      this.loadLines(txt);
+
+      var self = this;
+      if (self.executing) {
+        safeCall(self, function() {
+          self.execute();
+        });
+      }
+    };
+
+    // Helper: build base stats by running startup once to process *create.
+    function _buildStartingStats(nav, sceneList) {
+      var stats = {};
+
+      // Stop startup from trying to actually play the game.
+      var oldFinish = Scene.prototype.finish;
+      var oldPageBreak = Scene.prototype.page_break;
+      var oldChoice = Scene.prototype.choice;
+      var oldGotoScene = Scene.prototype.goto_scene;
+      var oldGoto = Scene.prototype.goto;
+
+      Scene.prototype.finish = function() { this.finished = true; };
+      Scene.prototype.page_break = function() { this.finished = true; };
+      Scene.prototype.choice = function() { this.finished = true; };
+      Scene.prototype.goto_scene = function() { this.finished = true; };
+      Scene.prototype.goto = function() { this.finished = true; };
+
+      try {
+        var startupText = _getSceneText('startup');
+        if (!startupText) throw new Error("startup.txt is missing");
+
+        // Ensure nav has the scene list so *finish warnings work.
+        if (sceneList && sceneList.length) {
+          nav.setSceneList(sceneList);
+        }
+
+        var startupScene = new Scene('startup', stats, nav, {});
+        startupScene.loadLines(startupText.replace(/\r/g, ""));
+        startupScene.execute();
+      } finally {
+        Scene.prototype.finish = oldFinish;
+        Scene.prototype.page_break = oldPageBreak;
+        Scene.prototype.choice = oldChoice;
+        Scene.prototype.goto_scene = oldGotoScene;
+        Scene.prototype.goto = oldGoto;
+      }
+
+      // Use the post-startup stats as startingStats.
+      nav.setStartingStatsClone(stats);
+    }
+
+    // Main entry point called from Android.
+    window.runQuicktest = function(payloadJson) {
+      try {
+        var payload = (typeof payloadJson === 'string') ? JSON.parse(payloadJson) : payloadJson;
+        window.__CS_SCENES = payload.scenes || {};
+        var sceneList = payload.sceneList || [];
+
+        // Normalize sceneList entries (strip .txt)
+        sceneList = sceneList.map(function(s) {
+          s = _safeString(s);
+          return s.replace(/\.txt$/i, '');
+        }).filter(Boolean);
+
+        if (!sceneList.length) {
+          // Fallback: try to infer from available scenes (startup first)
+          var keys = Object.keys(window.__CS_SCENES).map(function(k){ return k.replace(/\.txt$/i,''); });
+          keys = keys.filter(function(k){ return k && k.toLowerCase() !== 'startup'; });
+          keys.sort();
+          sceneList = ['startup'].concat(keys);
+        }
+
+        var nav = new SceneNavigator(sceneList);
+
+        // Verify that referenced scenes exist in our injected map.
+        Scene.prototype.verifySceneFile = function(sceneName) {
+          var txt = _getSceneText(sceneName);
+          if (!txt) {
+            throw new Error(this.lineMsg() + "File does not exist: " + sceneName + ".txt");
+          }
+        };
+
+        // Don't fail on missing image checks in editor mode unless you later add image map.
+        Scene.prototype.verifyImage = function(name) {
+          // no-op for now
+        };
+
+        // Build starting stats from startup.
+        _buildStartingStats(nav, sceneList);
+
+        // Run autotester on each scene file.
+        for (var i = 0; i < sceneList.length; i++) {
+          var sceneName = sceneList[i];
+          var sceneText = _getSceneText(sceneName);
+          if (!sceneText) {
+            throw new Error(sceneName + ": scene text missing");
+          }
+
+          // embeddable-autotester mutates prototypes; running sequentially is expected.
+          autotester(sceneText.replace(/\r/g, ""), nav, sceneName);
+        }
+
+        if (window.QuicktestBridge && window.QuicktestBridge.onResult) {
+          window.QuicktestBridge.onResult(JSON.stringify({ status: 'OK' }));
+        }
+        return 'OK';
+      } catch (e) {
+        var msg = (e && e.message) ? e.message : String(e);
+        if (window.QuicktestBridge && window.QuicktestBridge.onResult) {
+          window.QuicktestBridge.onResult(JSON.stringify({ status: 'ERROR', message: msg }));
+        }
+        return msg;
+      }
+    };
+
+    // --- Collect-all runner (iterative ignore via line-mutation) ---
+    function _parseSceneLineMessage(msg) {
+      msg = _safeString(msg);
+      // Expected: "<scene> line <n>: <rest>"
+      var m = /^(.+?) line (\d+):\s*([\s\S]*)$/.exec(msg);
+      if (!m) return { scene: "(unknown)", line: -1, message: msg };
+      return { scene: m[1], line: parseInt(m[2], 10) || -1, message: m[3] };
+    }
+
+    function _applyMutations(sceneName, txt, mutations) {
+      if (!mutations || !mutations[sceneName]) return txt;
+      var lines = txt.replace(/\r/g, "").split("\n");
+      var set = mutations[sceneName];
+      // set is an object: { "12": true, ... } where keys are 1-based line numbers
+      Object.keys(set).forEach(function(k) {
+        var lineNum = parseInt(k, 10);
+        if (!lineNum || lineNum < 1 || lineNum > lines.length) return;
+        var idx = lineNum - 1;
+        var original = lines[idx] || "";
+        var prefix = (/^\s*/.exec(original) || [""])[0];
+        lines[idx] = prefix + "*comment (skipped by error checker)";
+      });
+      return lines.join("\n");
+    }
+
+    function _ensureStartingStats(nav, sceneList, mutations, errorsOut, seenKeys) {
+      try {
+        _buildStartingStats(nav, sceneList);
+      } catch (e) {
+        var parsed = _parseSceneLineMessage((e && e.message) ? e.message : String(e));
+        var key = parsed.scene + ":" + parsed.line + ":" + parsed.message;
+        if (!seenKeys[key]) {
+          seenKeys[key] = true;
+          errorsOut.push(parsed);
+        }
+        // If we can locate a line, mutate it so later passes can progress.
+        if (parsed.scene && parsed.line > 0) {
+          mutations[parsed.scene] = mutations[parsed.scene] || {};
+          mutations[parsed.scene][String(parsed.line)] = true;
+        }
+        // Keep going with empty starting stats so we can discover other errors.
+        try { nav.setStartingStatsClone({}); } catch (_) {}
+      }
+    }
+
+    // New entry point: run Quicktest collecting all errors across passes.
+    // Returns: { status: "OK" } OR { status: "ERROR", errors: [{scene,line,message}, ...] }
+    window.runQuicktestCollectAll = function(payloadJson) {
+      try {
+        var payload = (typeof payloadJson === 'string') ? JSON.parse(payloadJson) : payloadJson;
+        window.__CS_SCENES = payload.scenes || {};
+        var sceneList = payload.sceneList || [];
+
+        sceneList = sceneList.map(function(s) {
+          s = _safeString(s);
+          return s.replace(/\.txt$/i, '');
+        }).filter(Boolean);
+
+        if (!sceneList.length) {
+          var keys = Object.keys(window.__CS_SCENES).map(function(k){ return k.replace(/\.txt$/i,''); });
+          keys = keys.filter(function(k){ return k && k.toLowerCase() !== 'startup'; });
+          keys.sort();
+          sceneList = ['startup'].concat(keys);
+        }
+
+        // Max passes: each pass can reveal more errors in the same scene once earlier lines are skipped.
+        var maxPasses = payload.maxPasses || 25;
+
+        var mutations = {}; // { sceneName: { "lineNum": true } }
+        var errors = [];
+        var seen = {}; // key -> true
+
+        // Verify that referenced scenes exist in our injected map.
+        Scene.prototype.verifySceneFile = function(sceneName) {
+          var txt = _getSceneText(sceneName);
+          if (!txt) {
+            throw new Error(this.lineMsg() + "File does not exist: " + sceneName + ".txt");
+          }
+        };
+        Scene.prototype.verifyImage = function(name) { /* no-op */ };
+
+        for (var pass = 0; pass < maxPasses; pass++) {
+          var newErrorsThisPass = 0;
+          var nav = new SceneNavigator(sceneList);
+          if (sceneList && sceneList.length) nav.setSceneList(sceneList);
+
+          _ensureStartingStats(nav, sceneList, mutations, errors, seen);
+
+          for (var i = 0; i < sceneList.length; i++) {
+            var sceneName = sceneList[i];
+            var rawText = _getSceneText(sceneName);
+            if (!rawText) {
+              var missing = { scene: sceneName, line: -1, message: "scene text missing" };
+              var mkey = missing.scene + ":" + missing.line + ":" + missing.message;
+              if (!seen[mkey]) { seen[mkey] = true; errors.push(missing); newErrorsThisPass++; }
+              continue;
+            }
+
+            var sceneText = _applyMutations(sceneName, rawText, mutations);
+
+            try {
+              autotester(sceneText.replace(/\r/g, ""), nav, sceneName);
+            } catch (e) {
+              var parsed = _parseSceneLineMessage((e && e.message) ? e.message : String(e));
+              // If parse didn't extract scene, use current sceneName
+              if (!parsed.scene || parsed.scene === "(unknown)") parsed.scene = sceneName;
+
+              var key = parsed.scene + ":" + parsed.line + ":" + parsed.message;
+              if (!seen[key]) {
+                seen[key] = true;
+                errors.push(parsed);
+                newErrorsThisPass++;
+              }
+
+              if (parsed.line > 0) {
+                mutations[parsed.scene] = mutations[parsed.scene] || {};
+                mutations[parsed.scene][String(parsed.line)] = true;
+              }
+              // Continue checking remaining scenes in this pass.
+            }
+          }
+
+          if (newErrorsThisPass === 0) break;
+        }
+
+        if (errors.length === 0) {
+          window.QuicktestBridge && window.QuicktestBridge.onResult && window.QuicktestBridge.onResult(JSON.stringify({ status: 'OK' }));
+          return 'OK';
+        } else {
+          window.QuicktestBridge && window.QuicktestBridge.onResult && window.QuicktestBridge.onResult(JSON.stringify({ status: 'ERROR', errors: errors }));
+          return JSON.stringify({ status: 'ERROR', errors: errors });
+        }
+      } catch (e) {
+        var msg = (e && e.message) ? e.message : String(e);
+        window.QuicktestBridge && window.QuicktestBridge.onResult && window.QuicktestBridge.onResult(JSON.stringify({ status: 'ERROR', message: msg }));
+        return msg;
+      }
+    };
+
+</script>
+</body>
+</html>

@@ -30,6 +30,17 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.io.OutputStreamWriter
 import kotlin.math.max
+import android.annotation.SuppressLint
+import android.content.Intent
+import android.webkit.JavascriptInterface
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import androidx.webkit.WebViewAssetLoader
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.InputStream
 
 class EditorActivityV3 : AppCompatActivity() {
 
@@ -47,6 +58,8 @@ class EditorActivityV3 : AppCompatActivity() {
     private lateinit var btnFormat: ImageButton
     private lateinit var btnZoomOut: ImageButton
     private lateinit var btnZoomIn: ImageButton
+    private lateinit var btnBold: ImageButton
+    private lateinit var btnItalic: ImageButton
     private var searchBar: MaterialCardView? = null
     private var searchInput: EditText? = null
     private var btnSearchPrev: ImageButton? = null
@@ -54,13 +67,34 @@ class EditorActivityV3 : AppCompatActivity() {
     private var btnSearchClose: ImageButton? = null
     private var currentSearchQuery: String = ""
 
+
+    private data class QuicktestError(
+        val scene: String,
+        val line: Int,
+        val message: String
+    )
+
+    private var lastQuicktestErrors: List<QuicktestError>? = null
+
+
     private var documentUri: Uri? = null
+    private var currentDisplayName: String? = null
+    private var projectTreeUri: Uri? = null
+
+    // If another screen opens the editor and wants us to jump to a specific line,
+    // it can pass: extra_goto_line_1based (Int). We apply it after the document is loaded.
+    private var pendingGotoLine0: Int? = null
     private var currentFontSp: Float = 18f
     private val MIN_FONT_SP: Float = 14f
     private val MAX_FONT_SP: Float = 32f
     private val FONT_STEP_SP: Float = 2f
 
     private var currentUiTint: Int = Color.WHITE
+
+    // Quicktest (ChoiceScript error checker)
+    private var quicktestWebView: WebView? = null
+    private var quicktestCallback: ((String?) -> Unit)? = null
+    private var quicktestTimeoutPosted: Boolean = false
 
     // ChoiceScript commands list for popup completion
     private val csCommands: List<String> = listOf(
@@ -69,9 +103,10 @@ class EditorActivityV3 : AppCompatActivity() {
         "create","create_array","temp","temp_array","set","setref","delete","input_number","input_text","print","rand",
         "if","elseif","else","elsif","return","params",
         "label","goto","goto_scene","goto_random_scene","gosub","gosub_scene","finish","ending","redirect_scene",
-        "image","line_break","page_break","link","stat_chart","bold","italic","sound","script","scene_list","pause",
+        "image","text_image","line_break","page_break","link","stat_chart","bold","italic","sound","script","scene_list","pause",
         "title","author","ifid","save_checkpoint","restore_checkpoint","comment","bug","looplimit","more_games",
-        "share_this_game","show_password"
+        "share_this_game","show_password",
+        "\${}", "\$!{}"
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -105,6 +140,8 @@ class EditorActivityV3 : AppCompatActivity() {
         btnFormat = findViewById(R.id.btnFormat)
         btnZoomOut = findViewById(R.id.btnZoomOut)
         btnZoomIn = findViewById(R.id.btnZoomIn)
+        btnBold = findViewById(R.id.btnBold)
+        btnItalic = findViewById(R.id.btnItalic)
 
         // Search bar views
         searchBar = findViewById<View>(R.id.searchBar) as? MaterialCardView
@@ -116,7 +153,7 @@ class EditorActivityV3 : AppCompatActivity() {
             wireUpSearchBar()
         }
 
-        // Apply surrounding UI theme AFTER buttons exist
+        // Apply surrounding UI theme after buttons exist
         applySurroundingUiTheme(colors)
 
         btnUndo.setOnClickListener { editor.undo() }
@@ -126,10 +163,15 @@ class EditorActivityV3 : AppCompatActivity() {
         btnSearch.setOnClickListener { onSearchButtonPressed() }
         btnSave.setOnClickListener { saveDocument(showToast = true) }
 
-        // Error Checker button: not implemented yet
+        // Error Checker button: Quicktest
         btnFormat.setOnClickListener {
-            Toast.makeText(this, "Error checker not implemented", Toast.LENGTH_SHORT).show()
+            uiScope.launch(Dispatchers.Main) {
+                runQuicktestFromEditorButton()
+            }
         }
+
+        btnBold.setOnClickListener { editor.toggleBold() }
+        btnItalic.setOnClickListener { editor.toggleItalic() }
 
         btnZoomIn.setOnClickListener {
             currentFontSp = (currentFontSp + FONT_STEP_SP).coerceAtMost(MAX_FONT_SP)
@@ -147,18 +189,31 @@ class EditorActivityV3 : AppCompatActivity() {
         }
 
         var displayName = intent.getStringExtra("extra_display_name")
+        currentDisplayName = displayName
+        val projStr = intent.getStringExtra("extra_project_uri")
+        if (!projStr.isNullOrBlank()) projectTreeUri = Uri.parse(projStr)
         val uriStr = intent.getStringExtra("extra_document_uri")
+
+        // Optional: jump to a specific line after loading (1-based line number).
+        val gotoLine1 = intent.getIntExtra("extra_goto_line_1based", -1)
+        if (gotoLine1 > 0) {
+            pendingGotoLine0 = (gotoLine1 - 1).coerceAtLeast(0)
+        }
         if (!uriStr.isNullOrBlank()) {
             documentUri = Uri.parse(uriStr)
             if (displayName.isNullOrBlank()) {
-                DocumentFile.fromSingleUri(this, documentUri!!)?.name?.let { displayName = it }
+                DocumentFile.fromSingleUri(this, documentUri!!)?.name?.let {
+                    displayName = it
+                    currentDisplayName = it
+                }
             }
             loadDocumentIntoEditor()
         }
 
         toolbar.title = displayName ?: ""
+        currentDisplayName = displayName
         toolbar.setTitleTextColor(currentUiTint)
-        AppCompatResources.getDrawable(this, androidx.appcompat.R.drawable.abc_ic_ab_back_material)?.let { d ->
+        AppCompatResources.getDrawable(this, R.drawable.ic_arrow_back_24)?.let { d ->
             d.setTint(currentUiTint)
             toolbar.navigationIcon = d
         }
@@ -331,6 +386,15 @@ class EditorActivityV3 : AppCompatActivity() {
             contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: ""
         }.onSuccess { content ->
             editor.setTextContent(content)
+
+            // Apply any pending line-jump request (e.g., from ProjectFilesActivity error checker).
+            pendingGotoLine0?.let { targetLine0 ->
+                pendingGotoLine0 = null
+                val delays = longArrayOf(0L, 40L, 120L, 250L, 450L, 700L, 1000L)
+                for (d in delays) {
+                    editor.postDelayed({ editor.goToLine(targetLine0) }, d)
+                }
+            }
         }.onFailure {
             Toast.makeText(this, "Failed to open file.", Toast.LENGTH_SHORT).show()
         }
@@ -547,7 +611,7 @@ class EditorActivityV3 : AppCompatActivity() {
         toolbar.navigationIcon?.setTint(tint)
 
         // Bottom bar icon tint
-        listOf(btnUndo, btnRedo, btnIndent, btnOutdent, btnFormat, btnZoomOut, btnZoomIn, btnSearch, btnSave).forEach { b ->
+        listOf(btnUndo, btnRedo, btnIndent, btnOutdent, btnBold, btnItalic, btnFormat, btnZoomOut, btnZoomIn, btnSearch, btnSave).forEach { b ->
             b.setColorFilter(tint)
         }
 
@@ -561,5 +625,333 @@ class EditorActivityV3 : AppCompatActivity() {
 
         // Update the theme icon tint if the menu already exists
         invalidateOptionsMenu()
+    }
+
+
+    // Quicktest (ChoiceScript error checker)
+
+
+    private fun showQuicktestErrorsDialog(errors: List<QuicktestError>) {
+        // Clear stored list so future runs don't accidentally reuse it
+        lastQuicktestErrors = null
+        var dialog: AlertDialog? = null
+
+
+        val scroll = android.widget.ScrollView(this)
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(
+                (16 * resources.displayMetrics.density).toInt(),
+                (12 * resources.displayMetrics.density).toInt(),
+                (16 * resources.displayMetrics.density).toInt(),
+                (12 * resources.displayMetrics.density).toInt()
+            )
+        }
+        scroll.addView(container)
+
+        fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+
+        errors.forEachIndexed { index, e ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            }
+
+            val textBox = android.widget.TextView(this).apply {
+                val sceneTitle = if (e.scene.endsWith(".txt", ignoreCase = true)) e.scene else "${e.scene}.txt"
+                val linePart = if (e.line > 0) " — line ${e.line}" else ""
+                text = "${index + 1}) $sceneTitle$linePart\n${e.message}"
+                setPadding(0, 0, dp(12), 0)
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+
+            val btn = Button(this).apply {
+                text = "Go to"
+                isAllCaps = false
+                setOnClickListener {
+                    dialog?.dismiss()
+                    openSceneAndJump(e.scene, e.line)
+                }
+            }
+
+            row.addView(textBox)
+            row.addView(btn)
+            container.addView(row)
+
+            // Divider
+            if (index != errors.lastIndex) {
+                val divider = View(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        dp(1)
+                    ).apply { topMargin = dp(10); bottomMargin = dp(10) }
+                    setBackgroundColor(Color.parseColor("#22000000"))
+                }
+                container.addView(divider)
+            }
+        }
+
+        dialog = AlertDialog.Builder(this)
+            .setTitle("Quicktest Errors (${errors.size})")
+            .setView(scroll)
+            .setPositiveButton("OK", null)
+            .create()
+        dialog.show()
+    }
+
+    private fun openSceneAndJump(sceneName: String, lineOneBased: Int) {
+        val targetLine0 = (lineOneBased - 1).coerceAtLeast(0)
+
+        // If the error didn't include a line, just open the file (if we can) without jumping.
+        val hasLine = lineOneBased > 0
+
+        val projUri = projectTreeUri
+        if (projUri == null) {
+            if (hasLine) editor.goToLine(targetLine0)
+            return
+        }
+
+        val project = DocumentFile.fromTreeUri(this, projUri)
+        if (project == null) {
+            if (hasLine) editor.goToLine(targetLine0)
+            return
+        }
+
+        val scenesDir = resolveScenes(project)
+
+        // Normalize to a .txt file name
+        val wanted = if (sceneName.endsWith(".txt", ignoreCase = true)) sceneName else "$sceneName.txt"
+
+        // If already open, just jump
+        val current = currentDisplayName
+        if (!current.isNullOrBlank() && current.equals(wanted, ignoreCase = true)) {
+            if (hasLine) editor.goToLine(targetLine0)
+            return
+        }
+
+        val targetFile = scenesDir.listFiles().firstOrNull { it.isFile && (it.name?.equals(wanted, ignoreCase = true) == true) }
+        if (targetFile == null) {
+            Toast.makeText(this, "Couldn't open $wanted", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        documentUri = targetFile.uri
+        currentDisplayName = targetFile.name
+        toolbar.title = currentDisplayName ?: ""
+
+        loadDocumentIntoEditor()
+
+        if (hasLine) {
+            // When switching files, Sora applies text/layout asynchronously. A single post() can run too early:
+            // it selects the line but doesn't scroll if the target is off-screen. Retry a few times with small delays.
+            val delays = longArrayOf(0L, 40L, 120L, 250L, 450L, 700L, 1000L)
+            for (d in delays) {
+                editor.postDelayed({ editor.goToLine(targetLine0) }, d)
+            }
+        }
+    }
+    private fun resolveScenes(project: DocumentFile): DocumentFile {
+        project.findFile("scenes")?.let { return it }
+        project.findFile("mygame")?.findFile("scenes")?.let { return it }
+        return project
+    }
+
+    private fun readText(df: DocumentFile): String {
+        val ins: InputStream = contentResolver.openInputStream(df.uri) ?: return ""
+        return ins.use { String(it.readBytes()) }
+    }
+
+    private fun parseSceneListFromStartup(startupText: String): List<String> {
+        val lines = startupText.replace("\r", "").split("\n")
+        var idx = -1
+        for (i in lines.indices) {
+            if (lines[i].trimStart().startsWith("*scene_list", ignoreCase = true)) {
+                idx = i
+                break
+            }
+        }
+        if (idx == -1) return emptyList()
+
+        val scenes = mutableListOf<String>()
+        var expectedIndent: Int? = null
+        for (i in (idx + 1) until lines.size) {
+            val raw = lines[i]
+            if (raw.trim().isEmpty()) continue
+            val indent = raw.takeWhile { it == ' ' || it == '\t' }.length
+            if (indent == 0) break
+            if (expectedIndent == null) expectedIndent = indent
+            if (indent != expectedIndent) continue
+
+            var line = raw.trim()
+            // support "$product sceneName" format; we only need the sceneName
+            if (line.startsWith("$")) {
+                val parts = line.split(Regex("\\s+"), limit = 2)
+                if (parts.size == 2) line = parts[1].trim()
+            }
+            if (line.isNotBlank()) scenes.add(line)
+        }
+
+        // Ensure startup is first if scene_list omits it
+        val normalized = scenes.map { it.removeSuffix(".txt") }.toMutableList()
+        if (normalized.isEmpty()) return emptyList()
+        if (!normalized.first().equals("startup", ignoreCase = true)) {
+            if (normalized.none { it.equals("startup", ignoreCase = true) }) {
+                normalized.add(0, "startup")
+            } else {
+                normalized.removeAll { it.equals("startup", ignoreCase = true) }
+                normalized.add(0, "startup")
+            }
+        }
+        return normalized
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun runQuicktest(openFileName: String?, openFileText: String, callback: (String?) -> Unit) {
+        val projUri = projectTreeUri
+        if (projUri == null) {
+            callback("No project selected.")
+            return
+        }
+
+        val project = DocumentFile.fromTreeUri(this, projUri)
+        if (project == null) {
+            callback("No project selected.")
+            return
+        }
+
+        val scenesDir = resolveScenes(project)
+
+        // Build { sceneNameWithoutExt : text }
+        val sceneMap = org.json.JSONObject()
+        val files = scenesDir.listFiles().filter { it.isFile && (it.name?.endsWith(".txt", true) == true) }
+        for (f in files) {
+            val nameWithExt = f.name ?: continue
+            val name = nameWithExt.removeSuffix(".txt")
+
+            // If this is the currently-open file, inject the editor's current text (including unsaved edits)
+            if (!openFileName.isNullOrBlank() && nameWithExt.equals(openFileName, ignoreCase = true)) {
+                sceneMap.put(name, openFileText)
+            } else {
+                sceneMap.put(name, readText(f))
+            }
+        }
+
+        val startup = sceneMap.optString("startup", "")
+        val sceneList = parseSceneListFromStartup(startup)
+        val sceneListJson = org.json.JSONArray()
+        for (s in sceneList) sceneListJson.put(s)
+
+        val payload = org.json.JSONObject().apply {
+            put("scenes", sceneMap)
+            put("sceneList", sceneListJson)
+        }
+
+        quicktestCallback = callback
+
+        val webView = WebView(this)
+        quicktestWebView = webView
+        webView.settings.javaScriptEnabled = true
+        webView.settings.domStorageEnabled = true
+
+        val assetLoader = WebViewAssetLoader.Builder()
+            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+            .build()
+
+        class QuicktestBridge {
+            @JavascriptInterface
+            fun onResult(resultJson: String) {
+                runOnUiThread {
+                    try {
+                        val obj = org.json.JSONObject(resultJson)
+                        val status = obj.optString("status")
+                        if (status == "OK") {
+                            quicktestCallback?.invoke(null)
+                        } else {
+                            // If the checker returns an errors array, keep them structured so the UI can render per-error actions.
+                            val errorsArr = obj.optJSONArray("errors")
+                            if (errorsArr != null && errorsArr.length() > 0) {
+                                val list = ArrayList<QuicktestError>(errorsArr.length())
+                                val sb = StringBuilder()
+                                for (i in 0 until errorsArr.length()) {
+                                    val er = errorsArr.optJSONObject(i)
+                                    val scene = er?.optString("scene")?.takeIf { it.isNotBlank() } ?: "(unknown)"
+                                    val line = er?.optInt("line", -1) ?: -1 // 1-based from checker (usually)
+                                    val msg = er?.optString("message")?.takeIf { it.isNotBlank() } ?: "(no message)"
+                                    list.add(QuicktestError(scene = scene, line = line, message = msg))
+
+                                    // Keep a readable fallback string too
+                                    sb.append(i + 1).append(") ").append(scene)
+                                    if (line > 0) sb.append(" (line ").append(line).append(")")
+                                    sb.append("\n").append(msg)
+                                    if (i != errorsArr.length() - 1) sb.append("\n\n")
+                                }
+                                lastQuicktestErrors = list
+                                quicktestCallback?.invoke(sb.toString())
+                            } else {
+                                quicktestCallback?.invoke(obj.optString("message"))
+                            }
+                        }
+                    } catch (e: Exception) {
+                        quicktestCallback?.invoke(resultJson)
+                    }
+                }
+            }
+        }
+
+        webView.addJavascriptInterface(QuicktestBridge(), "QuicktestBridge")
+        webView.webViewClient = object : WebViewClient() {
+            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+                return assetLoader.shouldInterceptRequest(request.url)
+            }
+
+            override fun onPageFinished(view: WebView, url: String) {
+                val quoted = org.json.JSONObject.quote(payload.toString())
+                view.evaluateJavascript("window.runQuicktestCollectAll($quoted);", null)
+            }
+        }
+
+        webView.loadUrl("https://appassets.androidplatform.net/assets/choicescript/checker/quicktest_checker.html")
+    }
+
+    // Called by btnFormat (Error Checker) in the editor bottom bar
+    private suspend fun runQuicktestFromEditorButton() {
+        val openName = currentDisplayName
+        val openText = editor.getTextContent()
+
+        // Non-cancelable loading indicator while the checker runs
+        val loadingView = android.widget.ProgressBar(this@EditorActivityV3)
+        val loadingDialog = AlertDialog.Builder(this@EditorActivityV3)
+            .setTitle("Running error checker")
+            .setMessage("Quicktest is running across the whole project. Don’t leave this page until it finishes.")
+            .setView(loadingView)
+            .setCancelable(false)
+            .create()
+        loadingDialog.show()
+
+        runQuicktest(openName, openText) { err ->
+            loadingDialog.dismiss()
+
+            // Cleanup hidden WebView
+            quicktestWebView?.destroy()
+            quicktestWebView = null
+
+            if (err == null) {
+                Toast.makeText(this@EditorActivityV3, "Quicktest passed (no errors).", Toast.LENGTH_SHORT).show()
+            } else {
+                val errs = lastQuicktestErrors
+                if (!errs.isNullOrEmpty()) {
+                    showQuicktestErrorsDialog(errs)
+                } else {
+                    AlertDialog.Builder(this@EditorActivityV3)
+                        .setTitle("Quicktest Error")
+                        .setMessage(err)
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
+            }
+        }
     }
 }

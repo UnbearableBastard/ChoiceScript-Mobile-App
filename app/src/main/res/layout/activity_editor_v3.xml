@@ -142,141 +142,157 @@
             app:cardElevation="3dp"
             app:cardBackgroundColor="#424242">
 
-            <LinearLayout
+            <HorizontalScrollView
+                android:id="@+id/bottomBarScroll"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
+                android:scrollbars="none"
+                android:overScrollMode="never"
+                android:fillViewport="true">
 
-                <ImageButton
-                    android:id="@+id/btnUndo"
-                    android:layout_width="0dp"
+                <LinearLayout
+                    android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:layout_marginHorizontal="2dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="10dp"
-                    android:src="@drawable/ic_undo_24"
-                    android:contentDescription="@string/undo"
-                    android:scaleType="centerInside"
-                    android:adjustViewBounds="true"
-                    app:tint="@android:color/white" />
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
 
-                <ImageButton
-                    android:id="@+id/btnRedo"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:layout_marginHorizontal="2dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="10dp"
-                    android:src="@drawable/ic_redo_24"
-                    android:contentDescription="@string/redo"
-                    android:scaleType="centerInside"
-                    android:adjustViewBounds="true"
-                    app:tint="@android:color/white" />
+                    <ImageButton
+                        android:id="@+id/btnUndo"
+                        android:layout_width="48dp"
+                        android:layout_height="match_parent" android:layout_marginHorizontal="2dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:padding="10dp"
+                        android:src="@drawable/ic_undo_24"
+                        android:contentDescription="@string/undo"
+                        android:scaleType="centerInside"
+                        android:adjustViewBounds="true"
+                        app:tint="@android:color/white" />
 
-                <ImageButton
-                    android:id="@+id/btnIndent"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:layout_marginHorizontal="2dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="10dp"
-                    android:src="@drawable/ic_indent_24"
-                    android:contentDescription="@string/indent"
-                    android:scaleType="centerInside"
-                    android:adjustViewBounds="true"
-                    app:tint="@android:color/white" />
+                    <ImageButton
+                        android:id="@+id/btnRedo"
+                        android:layout_width="48dp"
+                        android:layout_height="match_parent" android:layout_marginHorizontal="2dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:padding="10dp"
+                        android:src="@drawable/ic_redo_24"
+                        android:contentDescription="@string/redo"
+                        android:scaleType="centerInside"
+                        android:adjustViewBounds="true"
+                        app:tint="@android:color/white" />
 
-                <ImageButton
-                    android:id="@+id/btnOutdent"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:layout_marginHorizontal="2dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="10dp"
-                    android:src="@drawable/ic_outdent_24"
-                    android:contentDescription="@string/outdent"
-                    android:scaleType="centerInside"
-                    android:adjustViewBounds="true"
-                    app:tint="@android:color/white" />
+                    <ImageButton
+                        android:id="@+id/btnIndent"
+                        android:layout_width="48dp"
+                        android:layout_height="match_parent" android:layout_marginHorizontal="2dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:padding="10dp"
+                        android:src="@drawable/ic_indent_24"
+                        android:contentDescription="@string/indent"
+                        android:scaleType="centerInside"
+                        android:adjustViewBounds="true"
+                        app:tint="@android:color/white" />
 
-                <ImageButton
-                    android:id="@+id/btnFormat"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:layout_marginHorizontal="2dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="10dp"
-                    android:src="@drawable/ic_format"
-                    android:contentDescription="@string/format"
-                    android:scaleType="centerInside"
-                    android:adjustViewBounds="true"
-                    app:tint="@android:color/white" />
+                    <ImageButton
+                        android:id="@+id/btnOutdent"
+                        android:layout_width="48dp"
+                        android:layout_height="match_parent" android:layout_marginHorizontal="2dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:padding="10dp"
+                        android:src="@drawable/ic_outdent_24"
+                        android:contentDescription="@string/outdent"
+                        android:scaleType="centerInside"
+                        android:adjustViewBounds="true"
+                        app:tint="@android:color/white" />
 
-                <ImageButton
-                    android:id="@+id/btnZoomOut"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:layout_marginHorizontal="2dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="10dp"
-                    android:src="@drawable/zoom_out"
-                    android:contentDescription="@string/zoom_out"
-                    android:scaleType="centerInside"
-                    android:adjustViewBounds="true"
-                    android:scaleX="0.9"
-                    android:scaleY="0.9"
-                    app:tint="@android:color/white" />
+                    <ImageButton
+                        android:id="@+id/btnFormat"
+                        android:layout_width="48dp"
+                        android:layout_height="match_parent" android:layout_marginHorizontal="2dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:padding="10dp"
+                        android:src="@drawable/ic_format"
+                        android:contentDescription="@string/format"
+                        android:scaleType="centerInside"
+                        android:adjustViewBounds="true"
+                        app:tint="@android:color/white" />
+                    <ImageButton
+                        android:id="@+id/btnBold"
+                        android:layout_width="48dp"
+                        android:layout_height="match_parent" android:layout_marginHorizontal="2dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:padding="12dp"
+                        android:src="@drawable/ic_format_bold_24"
+                        android:contentDescription="Bold"
+                        android:scaleType="centerInside"
+                        android:adjustViewBounds="true"
+                        app:tint="@android:color/white" />
 
-                <ImageButton
-                    android:id="@+id/btnZoomIn"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:layout_marginHorizontal="2dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="10dp"
-                    android:src="@drawable/zoom_in"
-                    android:contentDescription="@string/zoom_in"
-                    android:scaleType="centerInside"
-                    android:adjustViewBounds="true"
-                    app:tint="@android:color/white" />
+                    <ImageButton
+                        android:id="@+id/btnItalic"
+                        android:layout_width="48dp"
+                        android:layout_height="match_parent" android:layout_marginHorizontal="2dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:padding="12dp"
+                        android:src="@drawable/ic_format_italic_24"
+                        android:contentDescription="Italic"
+                        android:scaleType="centerInside"
+                        android:adjustViewBounds="true"
+                        app:tint="@android:color/white" />
 
-                <ImageButton
-                    android:id="@+id/btnSearch"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:layout_marginHorizontal="2dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="10dp"
-                    android:src="@drawable/ic_search_24"
-                    android:contentDescription="@string/search"
-                    android:scaleType="centerInside"
-                    android:adjustViewBounds="true"
-                    app:tint="@android:color/white" />
 
-                <ImageButton
-                    android:id="@+id/btnSave"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:layout_marginHorizontal="2dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="10dp"
-                    android:src="@drawable/ic_save_24"
-                    android:contentDescription="@string/save"
-                    android:scaleType="centerInside"
-                    android:adjustViewBounds="true"
-                    app:tint="@android:color/white" />
+                    <ImageButton
+                        android:id="@+id/btnZoomOut"
+                        android:layout_width="48dp"
+                        android:layout_height="match_parent" android:layout_marginHorizontal="2dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:padding="10dp"
+                        android:src="@drawable/zoom_out"
+                        android:contentDescription="@string/zoom_out"
+                        android:scaleType="centerInside"
+                        android:adjustViewBounds="true"
+                        android:scaleX="0.9"
+                        android:scaleY="0.9"
+                        app:tint="@android:color/white" />
 
-            </LinearLayout>
+                    <ImageButton
+                        android:id="@+id/btnZoomIn"
+                        android:layout_width="48dp"
+                        android:layout_height="match_parent" android:layout_marginHorizontal="2dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:padding="10dp"
+                        android:src="@drawable/zoom_in"
+                        android:contentDescription="@string/zoom_in"
+                        android:scaleType="centerInside"
+                        android:adjustViewBounds="true"
+                        app:tint="@android:color/white" />
+
+                    <ImageButton
+                        android:id="@+id/btnSearch"
+                        android:layout_width="48dp"
+                        android:layout_height="match_parent" android:layout_marginHorizontal="2dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:padding="10dp"
+                        android:src="@drawable/ic_search_24"
+                        android:contentDescription="@string/search"
+                        android:scaleType="centerInside"
+                        android:adjustViewBounds="true"
+                        app:tint="@android:color/white" />
+
+                    <ImageButton
+                        android:id="@+id/btnSave"
+                        android:layout_width="48dp"
+                        android:layout_height="match_parent" android:layout_marginHorizontal="2dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:padding="10dp"
+                        android:src="@drawable/ic_save_24"
+                        android:contentDescription="@string/save"
+                        android:scaleType="centerInside"
+                        android:adjustViewBounds="true"
+                        app:tint="@android:color/white" />
+
+                </LinearLayout>
+
+            </HorizontalScrollView>
         </com.google.android.material.card.MaterialCardView>
     </androidx.constraintlayout.widget.ConstraintLayout>
 

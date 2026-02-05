@@ -20,15 +20,6 @@
         android:orientation="horizontal"
         android:padding="16dp">
 
-        <ImageView
-            android:id="@+id/imgFolder"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:layout_gravity="center_vertical"
-            android:contentDescription="@string/app_name"
-            app:srcCompat="@android:drawable/ic_menu_gallery"
-            app:tint="?attr/colorOnSurface" />
-
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"

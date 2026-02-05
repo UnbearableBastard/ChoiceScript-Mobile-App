@@ -19,7 +19,11 @@ class MainMenuActivity : AppCompatActivity() {
             try { contentResolver.takePersistableUriPermission(uri, flags) } catch (_: Exception) {}
 
             val picked = DocumentFile.fromTreeUri(this, uri)
-            val target = picked?.findFile("Choicescript Projects") ?: picked?.createDirectory("Choicescript Projects")
+            val target = if (picked?.name == "Choicescript Projects") {
+                picked
+            } else {
+                picked?.findFile("Choicescript Projects") ?: picked?.createDirectory("Choicescript Projects")
+            }
             if (target != null) {
                 StorageAccess.setProjectsRoot(this, target.uri)
                 startActivity(Intent(this, ProjectsBrowserActivity::class.java))

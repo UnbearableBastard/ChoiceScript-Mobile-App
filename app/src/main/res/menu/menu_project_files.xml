@@ -15,6 +15,12 @@
         android:title="Compile to HTML"
         app:showAsAction="never" />
 
+    <!-- Run ChoiceScript Quicktest on the project (same style errors as Runner/WebView) -->
+    <item
+        android:id="@+id/action_quicktest"
+        android:title="Quicktest"
+        app:showAsAction="never" />
+
     <!-- Run the game from the app -->
     <item
         android:id="@+id/action_run"

@@ -1,15 +1,10 @@
 package com.example.csideandroid.ui
 
-import android.os.Bundle
 import io.github.rosemoe.sora.lang.EmptyLanguage
 import io.github.rosemoe.sora.lang.analysis.AnalyzeManager
 import io.github.rosemoe.sora.lang.analysis.SimpleAnalyzeManager
-import io.github.rosemoe.sora.lang.completion.CompletionPublisher
-import io.github.rosemoe.sora.lang.completion.SimpleCompletionItem
 import io.github.rosemoe.sora.lang.styling.MappedSpans
 import io.github.rosemoe.sora.lang.styling.Styles
-import io.github.rosemoe.sora.text.CharPosition
-import io.github.rosemoe.sora.text.ContentReference
 import io.github.rosemoe.sora.widget.schemes.EditorColorScheme
 
 class ChoiceScriptLanguage(
@@ -123,50 +118,5 @@ class ChoiceScriptLanguage(
 
     fun setCommands(newCommands: List<String>) {
         commands = newCommands
-    }
-
-    override fun requireAutoComplete(
-        content: ContentReference,
-        position: CharPosition,
-        publisher: CompletionPublisher,
-        extraArguments: Bundle
-    ) {
-        val lineNumber = position.line
-        val column = position.column
-        // There must be at least one character on the line before the cursor
-        if (column == 0) return
-        val line = content.getLine(lineNumber)
-        // Find the position of the last '*' before the cursor
-        val starIndex = line.lastIndexOf('*', column - 1)
-        if (starIndex < 0) return
-        // Ensure the star starts a command, only allow whitespace before it
-        for (i in 0 until starIndex) {
-            val ch = line[i]
-            if (!ch.isWhitespace()) {
-                return
-            }
-        }
-        // Extract the already typed portion after '*'
-        val prefixStart = starIndex + 1
-        if (prefixStart > column) return
-        val typedPrefix = line.substring(prefixStart, column)
-        val p = typedPrefix.lowercase()
-
-        val matches = mutableListOf<SimpleCompletionItem>()
-        for (cmd in commands) {
-            if (p.isEmpty() || cmd.startsWith(p)) {
-                val item = SimpleCompletionItem("*$cmd", p.length, cmd)
-                matches.add(item)
-                if (matches.size >= 200) break
-            }
-        }
-        // Sort matches alphabetically to provide deterministic ordering
-        matches.sortBy { it.label.toString() }
-        if (matches.isNotEmpty()) {
-            @Suppress("UNCHECKED_CAST")
-            publisher.addItems(
-                matches as MutableCollection<io.github.rosemoe.sora.lang.completion.CompletionItem>
-            )
-        }
     }
 }

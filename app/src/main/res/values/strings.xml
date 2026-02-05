@@ -28,7 +28,7 @@
     <string name="close">Close</string>
     <string name="search">Search</string>
 
-    <!-- Error (Used to beFormatting) button labels -->
+    <!-- Error (Used to be Formatting) button labels -->
     <string name="format">Format</string>
 
     <!-- Label for the run/play button -->

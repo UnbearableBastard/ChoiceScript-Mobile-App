@@ -26,4 +26,14 @@
         android:layout_height="48dp"
         android:text="@string/choose_project_location"
         android:textAllCaps="false" />
+
+    <TextView
+        android:id="@+id/txtLocationWarning"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="8dp"
+        android:text="If this is a reinstall: do NOT select the “Choicescript Projects” folder itself — select the location that contains it."
+        android:textSize="12sp"
+        android:textColor="?android:attr/textColorSecondary" />
+
 </LinearLayout>
