@@ -1,6 +1,8 @@
 package com.example.csideandroid.ui
 
 import android.content.Intent
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.os.Bundle
 import android.text.format.DateUtils
 import android.view.View
@@ -34,6 +36,14 @@ import java.util.zip.ZipOutputStream
 import androidx.core.content.edit
 import android.transition.TransitionManager
 import android.view.ViewGroup
+import android.provider.Settings
+import java.io.BufferedInputStream
+import java.io.BufferedOutputStream
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.net.HttpURLConnection
+import java.net.URL
+import org.json.JSONObject
 
 class ProjectsBrowserActivity : AppCompatActivity() {
 
@@ -132,6 +142,12 @@ class ProjectsBrowserActivity : AppCompatActivity() {
     private val projectMetaInProgress = java.util.Collections.synchronizedSet(mutableSetOf<String>())
 
     private val projectMetaExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+
+    private val updateExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+
+    // --- GitHub updates (set these to your repo) ---
+    private val GITHUB_OWNER = "UnbearableBastard"
+    private val GITHUB_REPO = "ChoiceScript-Mobile-App"
 
     private var currentPinned: List<File> = emptyList()
     private var currentRecent: List<File> = emptyList()
@@ -290,6 +306,12 @@ class ProjectsBrowserActivity : AppCompatActivity() {
         findViewById<View>(R.id.btnRelocate).setOnClickListener {
             pickBase.launch(null)
         }
+
+
+        findViewById<View>(R.id.btnCheckUpdates)?.setOnClickListener {
+            checkForUpdates()
+            setSideMenuOpen(false)
+        }
         pinnedGrid = findViewById(R.id.recyclerPinned)
         recentGrid = findViewById(R.id.recyclerRecent)
         allGrid = findViewById(R.id.recyclerAll)
@@ -398,7 +420,191 @@ class ProjectsBrowserActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         projectMetaExecutor.shutdownNow()
+        updateExecutor.shutdownNow()
     }
+
+    private fun checkForUpdates() {
+        // Requires INTERNET permission in AndroidManifest.xml
+        Toast.makeText(this, "Checking for updates…", Toast.LENGTH_SHORT).show()
+        updateExecutor.execute {
+            val apiUrl = "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
+            try {
+                val conn = (URL(apiUrl).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 10_000
+                    readTimeout = 15_000
+                    requestMethod = "GET"
+                    setRequestProperty("Accept", "application/vnd.github+json")
+                    setRequestProperty("User-Agent", "$GITHUB_OWNER-$GITHUB_REPO-Android")
+                }
+
+                val code = conn.responseCode
+                val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+                val body = BufferedReader(InputStreamReader(stream)).use { it.readText() }
+                if (code !in 200..299) {
+                    runOnUiThread {
+                        Toast.makeText(this, "Update check failed ($code).", Toast.LENGTH_LONG).show()
+                    }
+                    return@execute
+                }
+
+                val json = JSONObject(body)
+                val latestTag = json.optString("tag_name", "").trim()
+                val assets = json.optJSONArray("assets")
+                var apkUrl: String? = null
+                var apkName: String? = null
+                if (assets != null) {
+                    for (i in 0 until assets.length()) {
+                        val a = assets.optJSONObject(i) ?: continue
+                        val name = a.optString("name", "")
+                        val url = a.optString("browser_download_url", "")
+                        if (name.endsWith(".apk", ignoreCase = true) && url.isNotBlank()) {
+                            apkUrl = url
+                            apkName = name
+                            break
+                        }
+                    }
+                }
+
+                val current = getCurrentVersionName()
+                val latest = latestTag
+
+                val isNewer = isVersionNewer(latest, current)
+                runOnUiThread {
+                    if (!isNewer) {
+                        Toast.makeText(this, "You have the latest version ($current).", Toast.LENGTH_LONG).show()
+                    } else if (apkUrl.isNullOrBlank()) {
+                        AlertDialog.Builder(this)
+                            .setTitle("Update available")
+                            .setMessage("A newer version ($latestTag) is available, but no APK asset was found in the latest GitHub release.")
+                            .setPositiveButton("OK", null)
+                            .show()
+                    } else {
+                        AlertDialog.Builder(this)
+                            .setTitle("Update available")
+                            .setMessage("A newer version ($latestTag) is available. Download and install now?")
+                            .setNegativeButton("Cancel", null)
+                            .setPositiveButton("Download") { _, _ ->
+                                downloadAndInstallApk(apkUrl!!, apkName ?: "update.apk")
+                            }
+                            .show()
+                    }
+                }
+            } catch (t: Throwable) {
+                runOnUiThread {
+                    Toast.makeText(this, "Update check failed: ${t.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    private fun downloadAndInstallApk(downloadUrl: String, suggestedName: String) {
+        // If the user hasn't allowed installs from this app, prompt the setting.
+        if (!packageManager.canRequestPackageInstalls()) {
+            AlertDialog.Builder(this)
+                .setTitle("Allow installs")
+                .setMessage("To install updates, allow this app to install unknown apps in Android settings.")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Open Settings") { _, _ ->
+                    val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                        data = Uri.parse("package:$packageName")
+                    }
+                    startActivity(intent)
+                }
+                .show()
+            return
+        }
+
+        Toast.makeText(this, "Downloading update…", Toast.LENGTH_SHORT).show()
+        updateExecutor.execute {
+            try {
+                val fileName = suggestedName.ifBlank { "update.apk" }
+                val outFile = File(getExternalFilesDir(null), fileName)
+                val conn = (URL(downloadUrl).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 10_000
+                    readTimeout = 30_000
+                    requestMethod = "GET"
+                    setRequestProperty("Accept", "application/octet-stream")
+                    setRequestProperty("User-Agent", "$GITHUB_OWNER-$GITHUB_REPO-Android")
+                    instanceFollowRedirects = true
+                }
+                conn.inputStream.use { input ->
+                    BufferedInputStream(input).use { bis ->
+                        FileOutputStream(outFile).use { fos ->
+                            BufferedOutputStream(fos).use { bos ->
+                                val buf = ByteArray(16 * 1024)
+                                while (true) {
+                                    val r = bis.read(buf)
+                                    if (r <= 0) break
+                                    bos.write(buf, 0, r)
+                                }
+                                bos.flush()
+                            }
+                        }
+                    }
+                }
+
+                runOnUiThread {
+                    promptInstallApk(outFile)
+                }
+            } catch (t: Throwable) {
+                runOnUiThread {
+                    Toast.makeText(this, "Download failed: ${t.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+
+    private fun setPendingUpdateRelaunch(pending: Boolean) {
+        getSharedPreferences("update_relaunch", MODE_PRIVATE)
+            .edit()
+            .putBoolean("pending", pending)
+            .apply()
+    }
+
+    private fun promptInstallApk(apkFile: File) {
+        try {
+            val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", apkFile)
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            setPendingUpdateRelaunch(true)
+            startActivity(intent)
+        } catch (t: Throwable) {
+            setPendingUpdateRelaunch(false)
+            Toast.makeText(this, "Could not launch installer: ${t.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+
+    private fun getCurrentVersionName(): String {
+        return try {
+            val pi = packageManager.getPackageInfo(packageName, 0)
+            (pi.versionName ?: "").trim()
+        } catch (_: Throwable) {
+            ""
+        }
+    }
+
+    private fun isVersionNewer(latest: String, current: String): Boolean {
+        // Very small semver-ish compare: 1.2.3 > 1.2.0
+        fun toParts(v: String): List<Int> {
+            val clean = v.trim().removePrefix("v").removePrefix("V")
+            return clean.split(Regex("[^0-9]+")).filter { it.isNotBlank() }.mapNotNull { it.toIntOrNull() }
+        }
+        val a = toParts(latest)
+        val b = toParts(current)
+        if (a.isEmpty() || b.isEmpty()) return latest != current
+        val n = maxOf(a.size, b.size)
+        for (i in 0 until n) {
+            val ai = if (i < a.size) a[i] else 0
+            val bi = if (i < b.size) b[i] else 0
+            if (ai != bi) return ai > bi
+        }
+        return false
+    }
+
 
     private fun showHelpPopup(force: Boolean) {
         if (!force && prefs.getBoolean(PREF_HIDE_HELP_POPUP, false)) return
@@ -837,5 +1043,19 @@ Editor & Error Checker
             Intent(this, ProjectFilesActivity::class.java)
                 .putExtra("extra_project_uri", df.uri.toString())
         )
+    }
+}
+
+class UpdateRelaunchReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent?) {
+        // Only relaunch if we explicitly started an in-app update install flow.
+        val prefs = context.getSharedPreferences("update_relaunch", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("pending", false)) return
+
+        prefs.edit().putBoolean("pending", false).apply()
+
+        val launch = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
+        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        context.startActivity(launch)
     }
 }

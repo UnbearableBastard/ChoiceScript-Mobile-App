@@ -3,4 +3,10 @@
     <cache-path
         name="cache"
         path="." />
+
+    <!-- Needed for APKs saved under:
+         /storage/emulated/0/Android/data/<package>/files/... -->
+    <external-files-path
+        name="external_files"
+        path="." />
 </paths>

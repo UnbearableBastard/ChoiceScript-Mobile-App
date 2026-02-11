@@ -86,6 +86,11 @@ class SoraEditorView @JvmOverloads constructor(
         editor.props.symbolPairAutoCompletion = true
         editor.setEditorLanguage(language)
 
+        // Enable auto-capitalization for sentences
+        editor.inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or
+                android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+
         // Disable Sora's built-in auto-completion popup to avoid double popup issue.
         editor.getComponent(io.github.rosemoe.sora.widget.component.EditorAutoCompletion::class.java).isEnabled = false
 
@@ -135,14 +140,20 @@ class SoraEditorView @JvmOverloads constructor(
         val safeCol = col.coerceIn(0, lineText.length)
         val beforeCursor = lineText.substring(0, safeCol)
 
-        // Current token since last whitespace
-        val lastWs = max(beforeCursor.lastIndexOf(' '), beforeCursor.lastIndexOf('\t'))
-        val token = beforeCursor.substring(lastWs + 1)
+        // FIX: Look for the last whitespace OR the last double quote
+        val lastBoundary = maxOf(
+            beforeCursor.lastIndexOf(' '),
+            beforeCursor.lastIndexOf('\t'),
+            beforeCursor.lastIndexOf('"') // Add this line
+        )
+        val token = beforeCursor.substring(lastBoundary + 1)
 
+        // This check now works even if the boundary was a "
         if (!(token.startsWith("*") || token.startsWith("$"))) {
             commandPopup.dismiss()
             return
         }
+
 
         val isStar = token.startsWith("*")
         val isDollar = token.startsWith("$")

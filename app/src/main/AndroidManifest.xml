@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.INTERNET" />
 
+
+
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <application
         android:name=".CSApp"
         android:allowBackup="true"
@@ -16,7 +20,7 @@
         <!-- Android Share Screen -->
         <provider
             android:name="androidx.core.content.FileProvider"
-            android:authorities="com.example.csideandroid.fileprovider"
+            android:authorities="${applicationId}.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">
             <meta-data
@@ -36,6 +40,7 @@
 
         <!-- Editor Activity -->
         <activity android:name=".ui.EditorActivityV3"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:windowSoftInputMode="adjustResize"/>
 
         <activity android:name=".ui.ProjectsBrowserActivity" android:exported="false" />
@@ -54,5 +59,14 @@
             android:name=".ui.TutorialActivity"
             android:exported="false"
             android:label="@string/title_tutorial" />
+
+        <receiver
+            android:name=".ui.UpdateRelaunchReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
     </application>
 </manifest>

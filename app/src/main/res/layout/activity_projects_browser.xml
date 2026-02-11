@@ -47,6 +47,13 @@
                 android:layout_height="40dp"
                 android:layout_marginTop="8dp"
                 android:text="Reselect" />
+
+            <Button
+                android:id="@+id/btnCheckUpdates"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="8dp"
+                android:text="Check for updates" />
         </LinearLayout>
 
         <androidx.core.widget.NestedScrollView
