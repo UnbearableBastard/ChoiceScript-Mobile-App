@@ -17,7 +17,6 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
 import android.net.Uri
-import android.widget.ImageButton
 import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -413,6 +412,8 @@ class ProjectsBrowserActivity : AppCompatActivity() {
         super.onResume()
         // Show the help popup every time unless the user opted out.
         showHelpPopup(force = false)
+        // Refresh lists (including "Recent") when returning to this screen.
+        reload()
     }
 
 
@@ -712,6 +713,11 @@ Editor & Error Checker
         var scenes = 0
         scenesDir?.listFiles()?.forEach {
             if (it.isFile && (it.name?.lowercase()?.endsWith(".txt") == true)) scenes++
+        }
+
+        // Fallback: some projects don't use /scenes; count all .txt files under the project folder.
+        if (scenes == 0) {
+            scenes = countTxtFilesRecursive(proj)
         }
 
         val t = getLastOpenedProject(name)
@@ -1044,6 +1050,22 @@ Editor & Error Checker
                 .putExtra("extra_project_uri", df.uri.toString())
         )
     }
+
+
+    private fun countTxtFilesRecursive(dir: DocumentFile): Int {
+        if (!dir.exists()) return 0
+        var count = 0
+        val children = dir.listFiles() ?: return 0
+        for (f in children) {
+            if (f.isDirectory) {
+                count += countTxtFilesRecursive(f)
+            } else if (f.isFile && f.name?.endsWith(".txt", ignoreCase = true) == true) {
+                count++
+            }
+        }
+        return count
+    }
+
 }
 
 class UpdateRelaunchReceiver : BroadcastReceiver() {
