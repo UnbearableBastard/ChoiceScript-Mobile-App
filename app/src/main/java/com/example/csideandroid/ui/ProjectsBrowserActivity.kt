@@ -43,8 +43,13 @@ import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
 import org.json.JSONObject
-
 class ProjectsBrowserActivity : AppCompatActivity() {
+
+    companion object {
+        // Ensures the automatic update check runs only once per cold app process start.
+        private var didBootUpdateCheck: Boolean = false
+    }
+
 
     private val prefs by lazy { getSharedPreferences("cside_prefs", MODE_PRIVATE) }
 
@@ -139,6 +144,12 @@ class ProjectsBrowserActivity : AppCompatActivity() {
 
     private val projectMetaCache = mutableMapOf<String, Pair<String, String>>()
     private val projectMetaInProgress = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
+    // Word-count refresh runs once per menu open (onResume), in background, and only re-counts
+    // projects whose .txt fingerprint changed since last count. UI uses cached values immediately.
+    private val wordRefreshLock = Any()
+    @Volatile private var wordRefreshRunning: Boolean = false
+    @Volatile private var wordRefreshPending: Boolean = false
 
     private val projectMetaExecutor: ExecutorService = Executors.newSingleThreadExecutor()
 
@@ -404,6 +415,14 @@ class ProjectsBrowserActivity : AppCompatActivity() {
             promptNewProject()
         }
         reload()
+        // Populate/refresh cached word counts in the background on first open.
+        refreshWordCountsIfNeeded()
+
+        // Automatic update check: run only once per cold app process start (cold boot).
+        if (!didBootUpdateCheck) {
+            didBootUpdateCheck = true
+            checkForUpdates(userInitiated = false)
+        }
     }
 
 
@@ -414,6 +433,14 @@ class ProjectsBrowserActivity : AppCompatActivity() {
         showHelpPopup(force = false)
         // Refresh lists (including "Recent") when returning to this screen.
         reload()
+        // One background pass per menu open; UI stays instant because cached meta is shown immediately.
+        refreshWordCountsIfNeeded()
+
+        // Automatic update check: run only once per cold app process start (cold boot).
+        if (!didBootUpdateCheck) {
+            didBootUpdateCheck = true
+            checkForUpdates(userInitiated = false)
+        }
     }
 
 
@@ -424,9 +451,11 @@ class ProjectsBrowserActivity : AppCompatActivity() {
         updateExecutor.shutdownNow()
     }
 
-    private fun checkForUpdates() {
+    private fun checkForUpdates(userInitiated: Boolean = true) {
         // Requires INTERNET permission in AndroidManifest.xml
-        Toast.makeText(this, "Checking for updates…", Toast.LENGTH_SHORT).show()
+        if (userInitiated) {
+            Toast.makeText(this, "Checking for updates…", Toast.LENGTH_SHORT).show()
+        }
         updateExecutor.execute {
             val apiUrl = "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
             try {
@@ -442,8 +471,10 @@ class ProjectsBrowserActivity : AppCompatActivity() {
                 val stream = if (code in 200..299) conn.inputStream else conn.errorStream
                 val body = BufferedReader(InputStreamReader(stream)).use { it.readText() }
                 if (code !in 200..299) {
-                    runOnUiThread {
-                        Toast.makeText(this, "Update check failed ($code).", Toast.LENGTH_LONG).show()
+                    if (userInitiated) {
+                        runOnUiThread {
+                            Toast.makeText(this, "Update check failed ($code).", Toast.LENGTH_LONG).show()
+                        }
                     }
                     return@execute
                 }
@@ -472,7 +503,9 @@ class ProjectsBrowserActivity : AppCompatActivity() {
                 val isNewer = isVersionNewer(latest, current)
                 runOnUiThread {
                     if (!isNewer) {
-                        Toast.makeText(this, "You have the latest version ($current).", Toast.LENGTH_LONG).show()
+                        if (userInitiated) {
+                            Toast.makeText(this, "You have the latest version ($current).", Toast.LENGTH_LONG).show()
+                        }
                     } else if (apkUrl.isNullOrBlank()) {
                         AlertDialog.Builder(this)
                             .setTitle("Update available")
@@ -491,8 +524,10 @@ class ProjectsBrowserActivity : AppCompatActivity() {
                     }
                 }
             } catch (t: Throwable) {
-                runOnUiThread {
-                    Toast.makeText(this, "Update check failed: ${t.message}", Toast.LENGTH_LONG).show()
+                if (userInitiated) {
+                    runOnUiThread {
+                        Toast.makeText(this, "Update check failed: ${t.message}", Toast.LENGTH_LONG).show()
+                    }
                 }
             }
         }
@@ -580,7 +615,9 @@ class ProjectsBrowserActivity : AppCompatActivity() {
 
 
     private fun getCurrentVersionName(): String {
+        // Use PackageManager so this works regardless of BuildConfig generation / module boundaries.
         return try {
+            @Suppress("DEPRECATION")
             val pi = packageManager.getPackageInfo(packageName, 0)
             (pi.versionName ?: "").trim()
         } catch (_: Throwable) {
@@ -589,21 +626,79 @@ class ProjectsBrowserActivity : AppCompatActivity() {
     }
 
     private fun isVersionNewer(latest: String, current: String): Boolean {
-        // Very small semver-ish compare: 1.2.3 > 1.2.0
-        fun toParts(v: String): List<Int> {
-            val clean = v.trim().removePrefix("v").removePrefix("V")
-            return clean.split(Regex("[^0-9]+")).filter { it.isNotBlank() }.mapNotNull { it.toIntOrNull() }
+        // Robust SemVer-ish compare (handles: v1.2.3, 1.2, release-1.2.3, 1.2.3-rc.1, 1.2.3+build).
+        // If we can't parse BOTH, return false to avoid false-positive "update available".
+        data class SemVer(
+            val major: Int,
+            val minor: Int,
+            val patch: Int,
+            val pre: List<String> = emptyList()
+        )
+
+        fun parseSemVerLike(raw: String): SemVer? {
+            val s = raw.trim()
+            if (s.isBlank()) return null
+
+            // Find the first SemVer-ish token inside the string:
+            //   v1.2.3, 1.2, release-1.2.3, 1.2.3-rc.1, 1.2.3+build
+            val m = Regex(
+                """(?i)v?(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-([0-9A-Za-z.-]+))?(?:\+([0-9A-Za-z.-]+))?"""
+            ).find(s) ?: return null
+
+            val major = m.groupValues[1].toIntOrNull() ?: return null
+            val minor = m.groupValues[2].takeIf { it.isNotBlank() }?.toIntOrNull() ?: 0
+            val patch = m.groupValues[3].takeIf { it.isNotBlank() }?.toIntOrNull() ?: 0
+
+            val preRaw = m.groupValues[4].takeIf { it.isNotBlank() }
+            val pre = preRaw?.split('.')?.filter { it.isNotBlank() } ?: emptyList()
+
+            return SemVer(major, minor, patch, pre)
         }
-        val a = toParts(latest)
-        val b = toParts(current)
-        if (a.isEmpty() || b.isEmpty()) return latest != current
-        val n = maxOf(a.size, b.size)
-        for (i in 0 until n) {
-            val ai = if (i < a.size) a[i] else 0
-            val bi = if (i < b.size) b[i] else 0
-            if (ai != bi) return ai > bi
+
+        fun compareSemVer(a: SemVer, b: SemVer): Int {
+            if (a.major != b.major) return a.major.compareTo(b.major)
+            if (a.minor != b.minor) return a.minor.compareTo(b.minor)
+            if (a.patch != b.patch) return a.patch.compareTo(b.patch)
+
+            val aPre = a.pre
+            val bPre = b.pre
+            val aHasPre = aPre.isNotEmpty()
+            val bHasPre = bPre.isNotEmpty()
+
+            // Core equal: prerelease is LOWER precedence than normal.
+            if (!aHasPre && !bHasPre) return 0
+            if (!aHasPre && bHasPre) return 1
+            if (aHasPre && !bHasPre) return -1
+
+            val n = minOf(aPre.size, bPre.size)
+            for (i in 0 until n) {
+                val ai = aPre[i]
+                val bi = bPre[i]
+                if (ai == bi) continue
+
+                val aNum = ai.toIntOrNull()
+                val bNum = bi.toIntOrNull()
+
+                when {
+                    aNum != null && bNum != null -> {
+                        if (aNum != bNum) return aNum.compareTo(bNum)
+                    }
+                    aNum != null && bNum == null -> return -1 // numeric < non-numeric
+                    aNum == null && bNum != null -> return 1
+                    else -> {
+                        val c = ai.compareTo(bi) // ASCII lexical
+                        if (c != 0) return c
+                    }
+                }
+            }
+            // Shorter prerelease set has lower precedence if all previous identifiers equal.
+            return aPre.size.compareTo(bPre.size)
         }
-        return false
+
+        val a = parseSemVerLike(latest) ?: return false
+        val b = parseSemVerLike(current) ?: return false
+
+        return compareSemVer(a, b) > 0
     }
 
 
@@ -702,24 +797,6 @@ Editor & Error Checker
     // META SYSTEM
 
     private fun metaForProject(name: String): Pair<String, String> {
-        projectMetaCache[name]?.let { return it }
-
-        val root = StorageAccess.getProjectsRoot(this) ?: return "—" to "—"
-        val proj = root.findFile(name) ?: return "—" to "—"
-
-        val scenesDir = proj.findFile("scenes")
-            ?: proj.findFile("mygame")?.findFile("scenes")
-
-        var scenes = 0
-        scenesDir?.listFiles()?.forEach {
-            if (it.isFile && (it.name?.lowercase()?.endsWith(".txt") == true)) scenes++
-        }
-
-        // Fallback: some projects don't use /scenes; count all .txt files under the project folder.
-        if (scenes == 0) {
-            scenes = countTxtFilesRecursive(proj)
-        }
-
         val t = getLastOpenedProject(name)
         val bottom =
             if (t > 0) "Last opened " + DateUtils.getRelativeTimeSpanString(
@@ -727,35 +804,152 @@ Editor & Error Checker
             )
             else "Never opened"
 
-        val nf = NumberFormat.getIntegerInstance()
-        val baseMeta = "$scenes scenes — calculating words…" to bottom
+        // Always return immediately to keep the menu snappy
+        // Word counts are refreshed in the background once per menu open
+        projectMetaCache[name]?.let { return it.first to bottom }
 
-        projectMetaCache[name] = baseMeta
+        // Show last cached value instantly
+        prefs.getString("wc_top_$name", null)?.takeIf { it.isNotBlank() }?.let { top ->
+            val meta = top to bottom
+            projectMetaCache[name] = meta
+            return meta
+        }
 
-        if (!projectMetaInProgress.contains(name)) {
-            projectMetaInProgress.add(name)
-            projectMetaExecutor.execute {
-                try {
+        val base = "Calculating…" to bottom
+        projectMetaCache[name] = base
+        return base
+    }
+
+
+    private fun refreshWordCountsIfNeeded() {
+        synchronized(wordRefreshLock) {
+            if (wordRefreshRunning) {
+                // A refresh is already in-flight (e.g., user navigated away and came back quickly)
+                // Mark pending so we run exactly one more pass right after the current one finishes
+                wordRefreshPending = true
+                return
+            }
+            wordRefreshRunning = true
+        }
+
+        val root = StorageAccess.getProjectsRoot(this)
+        if (root == null) {
+            synchronized(wordRefreshLock) { wordRefreshRunning = false }
+            return
+        }
+
+        // Snapshot the currently displayed project names.
+        val names = LinkedHashSet<String>().apply {
+            currentPinned.forEach { add(it.name) }
+            currentRecent.forEach { add(it.name) }
+            currentAll.forEach { add(it.name) }
+        }
+
+        if (names.isEmpty()) {
+            synchronized(wordRefreshLock) { wordRefreshRunning = false }
+            return
+        }
+
+        projectMetaExecutor.execute {
+            var anyUiChange = false
+            val nf = NumberFormat.getIntegerInstance()
+
+            try {
+                for (name in names) {
+                    val proj = root.findFile(name) ?: continue
+
+                    // Fast fingerprint (metadata-only): max lastModified + txt file count.
+                    val stats = scanTxtStats(proj)
+                    val fp = "${stats.maxLastModified}|${stats.txtCount}"
+
+                    val fpKey = "wc_fp_$name"
+                    val topKey = "wc_top_$name"
+                    val prevFp = prefs.getString(fpKey, null)
+                    val cachedTop = prefs.getString(topKey, null)
+
+                    if (prevFp == fp) {
+                        // Unchanged since last count: ensure cache is filled from prefs if needed.
+                        if (projectMetaCache[name] == null && !cachedTop.isNullOrBlank()) {
+                            projectMetaCache[name] = (cachedTop to "")
+                            anyUiChange = true
+                        }
+                        continue
+                    }
+
+                    // Changed: re-count words and update cache + prefs.
                     val totalWords = WordCountUtil.countWordsInProject(proj, contentResolver)
                     val wordsStr = nf.format(totalWords)
-                    val finalTop = "$scenes scenes — $wordsStr words"
-                    val finalMeta = finalTop to bottom
-                    projectMetaCache[name] = finalMeta
+                    val top = "${stats.txtCount} scenes — $wordsStr words"
 
+                    prefs.edit {
+                        putString(fpKey, fp)
+                        putString(topKey, top)
+                    }
+
+                    projectMetaCache[name] = (top to "")
+                    anyUiChange = true
+                }
+
+                if (anyUiChange) {
                     runOnUiThread {
                         pinnedAdapter.update(currentPinned)
                         recentAdapter.update(currentRecent)
                         allAdapter.update(currentAll)
                     }
-                } finally {
-                    projectMetaInProgress.remove(name)
+                }
+            } finally {
+                var runAgain = false
+                synchronized(wordRefreshLock) {
+                    wordRefreshRunning = false
+                    if (wordRefreshPending) {
+                        wordRefreshPending = false
+                        runAgain = true
+                    }
+                }
+                if (runAgain) {
+                    // Queue exactly one follow-up pass; keeps UI instant and avoids constant updates.
+                    runOnUiThread { refreshWordCountsIfNeeded() }
                 }
             }
         }
-        return baseMeta
     }
 
-    // RELOAD WITH ORDER PERSISTENCE
+    private data class TxtStats(val txtCount: Int, val maxLastModified: Long)
+
+    // Metadata-only scan of .txt files under the project folder
+    private fun scanTxtStats(projectDir: DocumentFile): TxtStats {
+        var count = 0
+        var maxMod = 0L
+
+        val stack = ArrayDeque<DocumentFile>()
+        stack.add(projectDir)
+
+        while (stack.isNotEmpty()) {
+            val dir = stack.removeLast()
+            val children = try {
+                dir.listFiles()
+            } catch (_: Throwable) {
+                emptyArray<DocumentFile>()
+            }
+
+            for (c in children) {
+                if (c.isDirectory) {
+                    stack.add(c)
+                } else if (c.isFile) {
+                    val n = c.name ?: continue
+                    if (n.endsWith(".txt", ignoreCase = true)) {
+                        count++
+                        val lm = try { c.lastModified() } catch (_: Throwable) { 0L }
+                        if (lm > maxMod) maxMod = lm
+                    }
+                }
+            }
+        }
+
+        return TxtStats(count, maxMod)
+    }
+
+// RELOAD WITH ORDER PERSISTENCE
 
     private fun reload() {
         val root = StorageAccess.getProjectsRoot(this) ?: run {
@@ -1066,18 +1260,4 @@ Editor & Error Checker
         return count
     }
 
-}
-
-class UpdateRelaunchReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent?) {
-        // Only relaunch if we explicitly started an in-app update install flow.
-        val prefs = context.getSharedPreferences("update_relaunch", Context.MODE_PRIVATE)
-        if (!prefs.getBoolean("pending", false)) return
-
-        prefs.edit().putBoolean("pending", false).apply()
-
-        val launch = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
-        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        context.startActivity(launch)
-    }
 }

@@ -301,8 +301,24 @@ class SoraEditorView @JvmOverloads constructor(
         val safeCol = col.coerceIn(0, lineText.length)
         val beforeCursor = lineText.substring(0, safeCol)
 
-        val lastWs = max(beforeCursor.lastIndexOf(' '), beforeCursor.lastIndexOf('\t'))
-        val token = beforeCursor.substring(lastWs + 1)
+        // Find the "current token" immediately before the cursor, but treat quotes and punctuation
+        // as token boundaries too
+        val lastDelim = run {
+            var i = beforeCursor.length - 1
+            while (i >= 0) {
+                when (beforeCursor[i]) {
+                    ' ', '\t', '"', '\'', '(', ')', '[', ']', '{', '}', ',', ';', ':', '=', '+', '-', '/', '\\', '<', '>', '|', '&', '!', '?', '\n', '\r' -> break
+                }
+                i--
+            }
+            i
+        }
+
+        val token = beforeCursor.substring((lastDelim + 1).coerceIn(0, beforeCursor.length))
+        if (token.isEmpty()) return
+
+        // Support any completion triggers you show in the popup (currently *-commands and $-expressions),
+        // even when they appear inside quotes.
         if (!(token.startsWith("*") || token.startsWith("$"))) return
 
         if (token.startsWith("*")) {

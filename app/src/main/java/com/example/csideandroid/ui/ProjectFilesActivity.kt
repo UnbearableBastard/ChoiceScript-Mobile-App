@@ -44,6 +44,10 @@ import org.json.JSONObject
 import android.view.Menu
 import android.view.MenuItem
 
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
+
 private const val REQUEST_CREATE_SINGLE_HTML = 2002
 
 class ProjectFilesActivity : AppCompatActivity() {
@@ -64,12 +68,12 @@ class ProjectFilesActivity : AppCompatActivity() {
 
     private val prefs by lazy { getSharedPreferences("cside_prefs", MODE_PRIVATE) }
 
-    // --- Quicktest (ChoiceScript error checker) ---
+    // Quicktest (ChoiceScript error checker)
     private var quicktestWebView: WebView? = null
     private var quicktestCallback: ((String?) -> Unit)? = null
 
 
-    // ---- Quicktest (collect-all) results ----
+    // Quicktest (collect-all) results
     private data class QuicktestError(
         val scene: String,
         val line: Int,
@@ -100,6 +104,14 @@ class ProjectFilesActivity : AppCompatActivity() {
 
     private val fileMetaCache = mutableMapOf<String, Pair<String, String>>()
     private val fileMetaInProgress = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
+    // Batch word-count once per refresh
+    private val wordCountExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+    @Volatile private var wordCountGeneration: Int = 0
+    @Volatile private var wordCountFuture: Future<*>? = null
+    @Volatile private var needsWordCountRefreshOnResume: Boolean = false
+    @Volatile private var lastSubmittedFiles: List<File> = emptyList()
+
 
     private fun promptCompileToSingleHtml() {
         val project = projectTree
@@ -539,8 +551,77 @@ class ProjectFilesActivity : AppCompatActivity() {
         val saved = loadOrder(projectName)
         val finalList = applyOrder(rawFiles, saved)
 
+        lastSubmittedFiles = finalList
         adapter.submit(finalList)
+
+        // Batch compute word counts once per refresh (never from bind)
+        startBatchWordCount(finalList)
     }
+
+    private fun startBatchWordCount(orderedFiles: List<File>) {
+        // Cancel any previous batch
+        wordCountFuture?.cancel(true)
+        val gen = ++wordCountGeneration
+
+        // Snapshot names to avoid adapter/list changes during counting
+        val names = orderedFiles.mapNotNull { it.name }
+
+        // Mark as in-progress so metaFor can show placeholder without spawning threads
+        fileMetaInProgress.clear()
+        fileMetaInProgress.addAll(names)
+
+        wordCountFuture = wordCountExecutor.submit {
+            val updates = mutableMapOf<String, Pair<String, String>>()
+
+            // Build a quick lookup for DocumentFiles by name
+            val byName = cache.associateBy { it.name ?: "" }
+
+            for (name in names) {
+                if (Thread.currentThread().isInterrupted) break
+                val df = byName[name] ?: continue
+
+                val sizeStr = try { Formatter.formatShortFileSize(this, df.length()) } catch (_: Exception) { "—" }
+                val lm = try { df.lastModified() } catch (_: Exception) { 0L }
+                val whenStr =
+                    if (lm > 0)
+                        DateUtils.getRelativeTimeSpanString(
+                            lm,
+                            System.currentTimeMillis(),
+                            DateUtils.MINUTE_IN_MILLIS
+                        ).toString()
+                    else "—"
+
+                val meta: Pair<String, String> =
+                    if (name.endsWith(".txt", ignoreCase = true)) {
+                        val words = try { WordCountUtil.countWordsInFile(df, contentResolver) } catch (_: Exception) { -1 }
+                        if (words >= 0) {
+                            val nf = NumberFormat.getIntegerInstance()
+                            val wordsStr = nf.format(words)
+                            "$sizeStr – $wordsStr words" to whenStr
+                        } else {
+                            sizeStr to whenStr
+                        }
+                    } else {
+                        sizeStr to whenStr
+                    }
+
+                updates[name] = meta
+            }
+
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                if (gen != wordCountGeneration) return@runOnUiThread
+
+                fileMetaCache.clear()
+                fileMetaCache.putAll(updates)
+                fileMetaInProgress.clear()
+
+                // One UI refresh only (Option C)
+                adapter.notifyDataSetChanged()
+            }
+        }
+    }
+
 
     private fun metaFor(fake: File): Pair<String, String> {
         val name = fake.name ?: return "—" to "—"
@@ -559,27 +640,13 @@ class ProjectFilesActivity : AppCompatActivity() {
             else "—"
 
         val baseMeta: Pair<String, String> =
-            if (df.name?.endsWith(".txt", ignoreCase = true) == true)
+            if (df.name?.endsWith(".txt", ignoreCase = true) == true && fileMetaInProgress.contains(name))
                 "$sizeStr – calculating words…" to whenStr
             else sizeStr to whenStr
 
         fileMetaCache[name] = baseMeta
 
-        if (df.name?.endsWith(".txt", ignoreCase = true) == true &&
-            !fileMetaInProgress.contains(name)
-        ) {
-            fileMetaInProgress.add(name)
-            Thread {
-                try {
-                    val words = WordCountUtil.countWordsInFile(df, contentResolver)
-                    val nf = NumberFormat.getIntegerInstance()
-                    val wordsStr = nf.format(words)
-                    val finalMeta = "$sizeStr – $wordsStr words" to whenStr
-                    fileMetaCache[name] = finalMeta
-                    runOnUiThread { adapter.notifyDataSetChanged() }
-                } finally { fileMetaInProgress.remove(name) }
-            }.start()
-        }
+
 
         return baseMeta
     }
@@ -642,6 +709,7 @@ class ProjectFilesActivity : AppCompatActivity() {
         }
         val doc = mapDoc(fake) ?: return
         val projectUriStr = projectTree?.uri?.toString()
+        needsWordCountRefreshOnResume = true
         startActivity(
             Intent(this, EditorActivityV3::class.java)
                 .putExtra("extra_document_uri", doc.uri.toString())
@@ -729,6 +797,30 @@ class ProjectFilesActivity : AppCompatActivity() {
             Toast.makeText(this, "Delete failed", Toast.LENGTH_SHORT).show()
         }
         loadFiles()
+    }
+
+
+    override fun onResume() {
+        super.onResume()
+        if (isFinishing || isDestroyed) return
+        if (needsWordCountRefreshOnResume) {
+            needsWordCountRefreshOnResume = false
+            // Recount once when returning from the editor
+            startBatchWordCount(lastSubmittedFiles)
+        }
+    }
+
+    override fun onPause() {
+        // Cancel any in-flight word-count batch so Back/exit is instant.
+        wordCountFuture?.cancel(true)
+        super.onPause()
+    }
+
+    override fun onDestroy() {
+        // Ensure no background work survives the Activity.
+        wordCountFuture?.cancel(true)
+        try { wordCountExecutor.shutdownNow() } catch (_: Exception) {}
+        super.onDestroy()
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

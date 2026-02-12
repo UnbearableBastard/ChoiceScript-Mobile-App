@@ -59,14 +59,5 @@
             android:name=".ui.TutorialActivity"
             android:exported="false"
             android:label="@string/title_tutorial" />
-
-        <receiver
-            android:name=".ui.UpdateRelaunchReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-            </intent-filter>
-        </receiver>
-
     </application>
 </manifest>

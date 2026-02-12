@@ -14,8 +14,8 @@ android {
         minSdk = 26
         targetSdk = 36
 
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 8
+        versionName = "2.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -34,6 +34,7 @@ android {
     // Enable ViewBinding so we can reference views without findViewById
     buildFeatures {
         viewBinding = true
+        buildConfig = true
     }
 
     // Use Java 17 for toolchain + Kotlin JVM 17
@@ -47,11 +48,13 @@ android {
 }
 
 dependencies {
+    implementation("io.github.Rosemoe.sora-editor:editor:0.23.6")
     implementation("androidx.documentfile:documentfile:1.0.1")
     testImplementation("junit:junit:4.13.2")
     implementation("org.nanohttpd:nanohttpd:2.3.1")
     implementation("androidx.webkit:webkit:1.10.0")
     implementation(libs.androidx.core.ktx)
+    implementation("androidx.core:core-ktx:1.10.1")
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation(libs.androidx.activity)        // activity-ktx via version catalog

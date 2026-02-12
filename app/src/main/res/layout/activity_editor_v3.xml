@@ -151,10 +151,16 @@
                 android:fillViewport="true">
 
                 <LinearLayout
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:orientation="horizontal"
                     android:gravity="center_vertical">
+
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:layout_weight="1" />
 
                     <ImageButton
                         android:id="@+id/btnUndo"
@@ -168,6 +174,11 @@
                         android:adjustViewBounds="true"
                         app:tint="@android:color/white" />
 
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:layout_weight="1" />
+
                     <ImageButton
                         android:id="@+id/btnRedo"
                         android:layout_width="48dp"
@@ -179,6 +190,11 @@
                         android:scaleType="centerInside"
                         android:adjustViewBounds="true"
                         app:tint="@android:color/white" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:layout_weight="1" />
 
                     <ImageButton
                         android:id="@+id/btnIndent"
@@ -192,6 +208,11 @@
                         android:adjustViewBounds="true"
                         app:tint="@android:color/white" />
 
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:layout_weight="1" />
+
                     <ImageButton
                         android:id="@+id/btnOutdent"
                         android:layout_width="48dp"
@@ -204,6 +225,11 @@
                         android:adjustViewBounds="true"
                         app:tint="@android:color/white" />
 
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:layout_weight="1" />
+
                     <ImageButton
                         android:id="@+id/btnFormat"
                         android:layout_width="48dp"
@@ -215,6 +241,12 @@
                         android:scaleType="centerInside"
                         android:adjustViewBounds="true"
                         app:tint="@android:color/white" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:layout_weight="1" />
+
                     <ImageButton
                         android:id="@+id/btnBold"
                         android:layout_width="48dp"
@@ -226,6 +258,11 @@
                         android:scaleType="centerInside"
                         android:adjustViewBounds="true"
                         app:tint="@android:color/white" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:layout_weight="1" />
 
                     <ImageButton
                         android:id="@+id/btnItalic"
@@ -239,6 +276,10 @@
                         android:adjustViewBounds="true"
                         app:tint="@android:color/white" />
 
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:layout_weight="1" />
 
                     <ImageButton
                         android:id="@+id/btnZoomOut"
@@ -254,6 +295,11 @@
                         android:scaleY="0.9"
                         app:tint="@android:color/white" />
 
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:layout_weight="1" />
+
                     <ImageButton
                         android:id="@+id/btnZoomIn"
                         android:layout_width="48dp"
@@ -265,6 +311,11 @@
                         android:scaleType="centerInside"
                         android:adjustViewBounds="true"
                         app:tint="@android:color/white" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:layout_weight="1" />
 
                     <ImageButton
                         android:id="@+id/btnSearch"
@@ -278,6 +329,11 @@
                         android:adjustViewBounds="true"
                         app:tint="@android:color/white" />
 
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:layout_weight="1" />
+
                     <ImageButton
                         android:id="@+id/btnSave"
                         android:layout_width="48dp"
@@ -289,6 +345,12 @@
                         android:scaleType="centerInside"
                         android:adjustViewBounds="true"
                         app:tint="@android:color/white" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:layout_weight="1" />
+
 
                 </LinearLayout>
 
