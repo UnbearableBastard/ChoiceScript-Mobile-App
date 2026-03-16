@@ -79,22 +79,22 @@ class ChoiceScriptLanguage(
                     }
                 }
 
-                // Highlight inline variables: ${var} or $!{var}
+                // Highlight inline variables: ${var}, $!{var}, @{var|text}, @!{var|text}
                 run {
                     if (inlineVarColor != null) {
                         var searchFrom = 0
                         while (true) {
-                            // Look for either "${" or "$!{" patterns
-                            val braceStart = line.indexOf("\${", searchFrom)
-                            val capStart = line.indexOf("\$!{", searchFrom)
-                            val start = when {
-                                braceStart == -1 && capStart == -1 -> -1
-                                braceStart == -1 -> capStart
-                                capStart == -1 -> braceStart
-                                else -> kotlin.math.min(braceStart, capStart)
-                            }
+                            // Look for "${", "$!{", "@{", or "@!{" patterns
+                            val dollar    = line.indexOf("\${", searchFrom)
+                            val dollarCap = line.indexOf("\$!{", searchFrom)
+                            val at        = line.indexOf("@{", searchFrom)
+                            val atCap     = line.indexOf("@!{", searchFrom)
+                            val start = listOf(dollar, dollarCap, at, atCap)
+                                .filter { it != -1 }
+                                .minOrNull() ?: -1
                             if (start == -1) break
-                            // Determine offset: 2 for \${, 3 for \$!{
+                            // Determine offset past the opening brace:
+                            //   $!{ or @!{ → 3 chars,  ${ or @{ → 2 chars
                             val offset = if (start + 1 < line.length && line[start + 1] == '!') 3 else 2
                             val end = line.indexOf('}', start + offset)
                             if (end == -1) break

@@ -1,8 +1,6 @@
 package com.example.csideandroid.ui
 
 import android.content.Intent
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.os.Bundle
 import android.text.format.DateUtils
 import android.view.View
@@ -36,6 +34,7 @@ import androidx.core.content.edit
 import android.transition.TransitionManager
 import android.view.ViewGroup
 import android.provider.Settings
+import com.example.csideandroid.ui.model.ProjectGridAdapter
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.BufferedReader
@@ -502,6 +501,7 @@ class ProjectsBrowserActivity : AppCompatActivity() {
 
                 val isNewer = isVersionNewer(latest, current)
                 runOnUiThread {
+                    if (isDestroyed) return@runOnUiThread
                     if (!isNewer) {
                         if (userInitiated) {
                             Toast.makeText(this, "You have the latest version ($current).", Toast.LENGTH_LONG).show()
@@ -526,7 +526,9 @@ class ProjectsBrowserActivity : AppCompatActivity() {
             } catch (t: Throwable) {
                 if (userInitiated) {
                     runOnUiThread {
-                        Toast.makeText(this, "Update check failed: ${t.message}", Toast.LENGTH_LONG).show()
+                        if (!isDestroyed) {
+                            Toast.makeText(this, "Update check failed: ${t.message}", Toast.LENGTH_LONG).show()
+                        }
                     }
                 }
             }
@@ -580,11 +582,13 @@ class ProjectsBrowserActivity : AppCompatActivity() {
                 }
 
                 runOnUiThread {
-                    promptInstallApk(outFile)
+                    if (!isDestroyed) promptInstallApk(outFile)
                 }
             } catch (t: Throwable) {
                 runOnUiThread {
-                    Toast.makeText(this, "Download failed: ${t.message}", Toast.LENGTH_LONG).show()
+                    if (!isDestroyed) {
+                        Toast.makeText(this, "Download failed: ${t.message}", Toast.LENGTH_LONG).show()
+                    }
                 }
             }
         }
@@ -892,9 +896,11 @@ Editor & Error Checker
 
                 if (anyUiChange) {
                     runOnUiThread {
-                        pinnedAdapter.update(currentPinned)
-                        recentAdapter.update(currentRecent)
-                        allAdapter.update(currentAll)
+                        if (!isDestroyed) {
+                            pinnedAdapter.update(currentPinned)
+                            recentAdapter.update(currentRecent)
+                            allAdapter.update(currentAll)
+                        }
                     }
                 }
             } finally {
@@ -908,7 +914,7 @@ Editor & Error Checker
                 }
                 if (runAgain) {
                     // Queue exactly one follow-up pass; keeps UI instant and avoids constant updates.
-                    runOnUiThread { refreshWordCountsIfNeeded() }
+                    runOnUiThread { if (!isDestroyed) refreshWordCountsIfNeeded() }
                 }
             }
         }

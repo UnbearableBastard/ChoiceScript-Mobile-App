@@ -149,14 +149,14 @@ class SoraEditorView @JvmOverloads constructor(
         val token = beforeCursor.substring(lastBoundary + 1)
 
         // This check now works even if the boundary was a "
-        if (!(token.startsWith("*") || token.startsWith("$"))) {
+        if (!(token.startsWith("*") || token.startsWith("$") || token.startsWith("@"))) {
             commandPopup.dismiss()
             return
         }
 
-
-        val isStar = token.startsWith("*")
+        val isStar   = token.startsWith("*")
         val isDollar = token.startsWith("$")
+        val isAt     = token.startsWith("@")
 
         val typed = token.substring(1).lowercase() // chars after trigger
 
@@ -168,8 +168,15 @@ class SoraEditorView @JvmOverloads constructor(
                 .take(200)
                 .map { "*$it" }
                 .toList()
-        } else {
+        } else if (isDollar) {
             val exprs = listOf("\${}", "\$!{}")
+            exprs
+                .asSequence()
+                .filter { typed.isEmpty() || it.substring(1).startsWith(typed) }
+                .toList()
+        } else {
+            // @ trigger — multireplace expressions
+            val exprs = listOf("@{}", "@!{}")
             exprs
                 .asSequence()
                 .filter { typed.isEmpty() || it.substring(1).startsWith(typed) }
@@ -317,9 +324,9 @@ class SoraEditorView @JvmOverloads constructor(
         val token = beforeCursor.substring((lastDelim + 1).coerceIn(0, beforeCursor.length))
         if (token.isEmpty()) return
 
-        // Support any completion triggers you show in the popup (currently *-commands and $-expressions),
+        // Support any completion triggers you show in the popup (currently *-commands, $-expressions and @-multireplace),
         // even when they appear inside quotes.
-        if (!(token.startsWith("*") || token.startsWith("$"))) return
+        if (!(token.startsWith("*") || token.startsWith("$") || token.startsWith("@"))) return
 
         if (token.startsWith("*")) {
             val chosen = selectedWithStar.removePrefix("*")
@@ -334,10 +341,11 @@ class SoraEditorView @JvmOverloads constructor(
             if (suffix.isNotEmpty()) {
                 editor.insertText(suffix, suffix.length)
             }
-        } else if (token.startsWith("$")) {
-            val chosen = selectedWithStar // keep leading '$' (e.g., ${} or $!{})
-            val chosenAfter = chosen.removePrefix("$")
-            val alreadyAfter = token.substring(1) // what user typed after '$'
+        } else if (token.startsWith("$") || token.startsWith("@")) {
+            val trigger = token[0].toString() // "$" or "@"
+            val chosen = selectedWithStar // keep leading trigger char (e.g., ${} or @{})
+            val chosenAfter = chosen.removePrefix(trigger)
+            val alreadyAfter = token.substring(1) // what user typed after trigger
             val suffix = if (chosenAfter.startsWith(alreadyAfter, ignoreCase = true)) {
                 chosenAfter.substring(alreadyAfter.length)
             } else {

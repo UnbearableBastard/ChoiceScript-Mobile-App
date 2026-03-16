@@ -21,9 +21,167 @@ pre {
 h1, h2, h3 { color: #80cbc4; }
 a { color: #82b1ff; text-decoration: none; }
 a:hover { text-decoration: underline; }
+
+body {
+  margin: 0;
+  padding: 0;
+}
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+.sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  background: #181818;
+  border-right: 1px solid #2a2a2a;
+  padding: 20px 16px;
+  box-sizing: border-box;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+.sidebar h2 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 1.1rem;
+}
+.sidebar a {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 8px;
+  margin-bottom: 6px;
+}
+.sidebar a.active {
+  background: #263238;
+  color: #80cbc4;
+}
+.content {
+  flex: 1;
+  padding: 16px;
+  padding-bottom: 80px;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.burger {
+  display: none;
+  position: fixed;
+  top: 32px;
+  left: 14px;
+  z-index: 200;
+  background: #1e2a2a;
+  border: 1px solid #2e4040;
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  flex-direction: column;
+  gap: 5px;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  transition: background 0.2s, left 0.3s ease;
+}
+.burger:hover { background: #263838; }
+.burger span {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: #80cbc4;
+  border-radius: 2px;
+  transition: transform 0.3s, opacity 0.3s;
+  transform-origin: center;
+}
+/* animated X when open */
+.burger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.burger.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+.burger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+/* sidebar transition */
+.sidebar {
+  transition: transform 0.3s ease, width 0.3s ease;
+}
+
+.sidebar-scrim {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  z-index: 98;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.sidebar-scrim.visible {
+  opacity: 1;
+}
+@media (max-width: 700px) {
+  .burger { display: flex; }
+
+  .content { padding-top: 64px; }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    z-index: 100;
+    transform: translateX(-100%);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.5);
+  }
+  .sidebar.open {
+    transform: translateX(0);
+  }
+  .sidebar-scrim {
+    display: block;
+  }
+}
+@media (min-width: 701px) {
+  .burger { display: flex; }
+
+  .layout {
+    position: relative;
+  }
+  .sidebar {
+    overflow: hidden;
+  }
+  .sidebar.collapsed {
+    width: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+  .content {
+    padding-top: 16px;
+    transition: margin-left 0.3s;
+  }
+  .layout:not(.sidebar-collapsed) .content {
+    padding-left: 16px;
+  }
+}
+
 </style>
 </head>
 <body>
+<button class="burger" id="burgerBtn" aria-label="Toggle navigation">
+  <span></span><span></span><span></span>
+</button>
+<div class="sidebar-scrim" id="sidebarScrim"></div>
+
+<div class="layout">
+<nav class="sidebar">
+<h2>Tutorial Pages</h2>
+<a href="index.html">Part 1: What Is ChoiceScript?</a>
+<a href="part2.html" class="active">Part 2: The Basics & Indentation</a>
+<a href="part3.html">Part 3: Which choices to use and when</a>
+<a href="part4.html">Part 4: Stats & Conditions</a>
+<a href="part5.html">Part 5: The Stats Screen</a>
+<a href="part6.html">Part 6: Scenes & *scene_list</a>
+<a href="part7.html">Part 7: Temporary Variables & *rand</a>
+<a href="part8.html">Part 8: Common Errors & Debugging</a>
+</nav>
+<main class="content">
 <h1>Part 2: The Basics &amp; Indentation</h1>
 
 <p>A ChoiceScript story is made of text files. The most important ones are:</p>
@@ -62,8 +220,76 @@ Never this:
 
 <p>Each <code>#</code> option is indented under <code>*choice</code> and the text under <code>#</code> is indented further.</p>
 <p>This editor has increase & decrease indent buttons and uses 4 spaces. If you use this feature, then the rest of your code should be the same for a consistent structure.</p>
+</main>
+</div>
 
-<p><a href="index.html">← Back to Part 1</a> | <a href="part3.html">Next: Your First Choice Scene →</a></p>
+<script>
+(function() {
+  var btn    = document.getElementById('burgerBtn');
+  var sidebar = document.querySelector('.sidebar');
+  var scrim  = document.getElementById('sidebarScrim');
+  var isMobile = function() { return window.innerWidth <= 700; };
+
+  var SIDEBAR_WIDTH = 260; // must match .sidebar width in CSS
+  var BURGER_MARGIN = 14;  // left offset when sidebar is closed
+
+  function moveBurger(open) {
+    btn.style.left = open ? (SIDEBAR_WIDTH + BURGER_MARGIN) + 'px' : BURGER_MARGIN + 'px';
+  }
+
+  function openSidebar() {
+    sidebar.classList.add('open');
+    btn.classList.add('open');
+    moveBurger(true);
+    if (isMobile()) {
+      scrim.classList.add('visible');
+      document.body.style.overflow = 'hidden';
+    }
+  }
+  function closeSidebar() {
+    sidebar.classList.remove('open');
+    btn.classList.remove('open');
+    moveBurger(false);
+    scrim.classList.remove('visible');
+    document.body.style.overflow = '';
+    if (!isMobile()) {
+      sidebar.classList.add('collapsed');
+    }
+  }
+  function toggleSidebar() {
+    if (isMobile()) {
+      sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+    } else {
+      if (sidebar.classList.contains('collapsed')) {
+        sidebar.classList.remove('collapsed');
+        btn.classList.add('open');
+        moveBurger(true);
+      } else {
+        sidebar.classList.add('collapsed');
+        btn.classList.remove('open');
+        moveBurger(false);
+      }
+    }
+  }
+
+  btn.addEventListener('click', toggleSidebar);
+  scrim.addEventListener('click', closeSidebar);
+
+  // Close on nav link click on mobile
+  sidebar.querySelectorAll('a').forEach(function(a) {
+    a.addEventListener('click', function() {
+      if (isMobile()) closeSidebar();
+    });
+  });
+
+  window.addEventListener('resize', function() {
+    if (!isMobile()) {
+      scrim.classList.remove('visible');
+      document.body.style.overflow = '';
+    }
+  });
+})();
+</script>
 
 </body>
 </html>
