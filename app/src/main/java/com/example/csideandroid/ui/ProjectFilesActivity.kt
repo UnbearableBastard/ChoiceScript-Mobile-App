@@ -1108,5 +1108,16 @@ class ProjectFilesActivity : AppCompatActivity() {
                 break
             }
         }
+        // Auto-inject unique storeName based on projects folder name
+        val indexSrc = assets.open("choicescript/web/mygame/index.html")
+        val indexText = indexSrc.bufferedReader().readText()
+        val safeName = (projectRoot.name ?: "unnamed")
+            .replace("\"", "")
+            .replace("\\", "")
+        val patched = indexText.replace(
+            "window.storeName = null;",
+            "window.storeName = \"CS APP_${safeName}\";"
+        )
+        File(destRoot, "index.html").writeText(patched)
     }
 }
