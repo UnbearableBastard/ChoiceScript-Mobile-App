@@ -370,6 +370,13 @@ class ProjectFilesActivity : AppCompatActivity() {
         val toolbar = findViewById<MaterialToolbar>(R.id.topAppBar)
         toolbar.title = ""
 
+        // Apply right navigation bar inset to toolbar for landscape mode
+        ViewCompat.setOnApplyWindowInsetsListener(toolbar) { v, insets ->
+            val navInsets = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
+            v.setPadding(v.paddingLeft, v.paddingTop, navInsets.right, v.paddingBottom)
+            insets
+        }
+
         toolbar.inflateMenu(R.menu.menu_project_files)
 
         // Add overflow menu item to open CoG Demos upload page
@@ -454,7 +461,7 @@ class ProjectFilesActivity : AppCompatActivity() {
             v.setPadding(
                 initialLeft,
                 initialTop,
-                initialRight,
+                initialRight + navInsets.right,
                 initialBottom + navInsets.bottom
             )
             insets
@@ -593,11 +600,12 @@ class ProjectFilesActivity : AppCompatActivity() {
 
                 val meta: Pair<String, String> =
                     if (name.endsWith(".txt", ignoreCase = true)) {
-                        val words = try { WordCountUtil.countWordsInFile(df, contentResolver) } catch (_: Exception) { -1 }
-                        if (words >= 0) {
+                        val counts = try { WordCountUtil.countWordsInFileBoth(df, contentResolver) } catch (_: Exception) { null }
+                        if (counts != null) {
                             val nf = NumberFormat.getIntegerInstance()
-                            val wordsStr = nf.format(words)
-                            "$sizeStr – $wordsStr words" to whenStr
+                            val withStr = nf.format(counts.withCode)
+                            val withoutStr = nf.format(counts.withoutCode)
+                            "$sizeStr – $withStr words\n$withoutStr words w/o code" to whenStr
                         } else {
                             sizeStr to whenStr
                         }

@@ -697,6 +697,7 @@ object EditorThemeManager {
             "image",
             "line_break",
             "page_break",
+            "delay_break",
             "bold",
             "italic",
             "sound",
@@ -719,6 +720,7 @@ object EditorThemeManager {
             "bug",
             "comment",
             "looplimit",
+            "opposed_pair",
             "save_checkpoint",
             "restore_checkpoint"
         ).forEach { map[it] = metaColor }

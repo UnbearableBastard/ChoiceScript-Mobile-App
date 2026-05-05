@@ -1,4 +1,4 @@
-package com.example.csideandroid.ui
+package com.example.csideandroid.ui.model
 
 import android.content.res.ColorStateList
 import android.content.res.Configuration

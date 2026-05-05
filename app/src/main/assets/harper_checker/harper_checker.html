@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <script>
+        var linter = null;
+        var harperReady = false;
+
+        async function initHarper() {
+            try {
+                const harper = await import('https://appassets.androidplatform.net/assets/harper.js');
+                const { LocalLinter, createBinaryModuleFromUrl } = harper;
+                const binary = createBinaryModuleFromUrl('https://appassets.androidplatform.net/assets/harper_wasm_bg.wasm');
+                linter = new LocalLinter({ binary });
+                await linter.setup();
+                harperReady = true;
+                if (window.HarperBridge) window.HarperBridge.onReady();
+            } catch(e) {
+                console.error('Harper init error: ' + e.message);
+                if (window.HarperBridge) window.HarperBridge.onError('Init: ' + e.message);
+            }
+        }
+
+        window.runHarperCheck = async function(text, lineOffsetsJson, personalDictJson) {
+            if (!harperReady || !linter) {
+                if (window.HarperBridge) window.HarperBridge.onError('Not ready');
+                return;
+            }
+            try {
+                const personalWords = JSON.parse(personalDictJson || '[]');
+                if (personalWords.length > 0) await linter.importWords(personalWords);
+
+                const lints = await linter.lint(text, { language: 'plaintext' });
+                const lineOffsets = JSON.parse(lineOffsetsJson);
+
+                const results = [];
+                for (const lint of lints) {
+                    const span = lint.span();
+                    const charStart = span.start >>> 0;
+                    const charEnd = span.end >>> 0;
+                    span.free();
+                    const message = String(lint.message());
+
+                    let lineIndex = -1, startCol = 0, endCol = 0;
+                    for (let i = lineOffsets.length - 1; i >= 0; i--) {
+                        if (charStart >= lineOffsets[i].startCharOffset) {
+                            lineIndex = lineOffsets[i].lineIndex;
+                            startCol = charStart - lineOffsets[i].startCharOffset;
+                            endCol = charEnd - lineOffsets[i].startCharOffset;
+                            break;
+                        }
+                    }
+                    if (lineIndex === -1) { lint.free(); continue; }
+
+                    // Use get_replacement_text() directly — simpler and more reliable
+                    const suggestions = [];
+                    try {
+                        const suggObjs = lint.suggestions();
+                        for (const s of suggObjs) {
+                            try {
+                                const replacement = String(s.get_replacement_text());
+                                if (replacement && replacement.length > 0) {
+                                    suggestions.push(replacement);
+                                }
+                                s.free();
+                            } catch(_) {}
+                        }
+                    } catch(_) {}
+
+                    lint.free();
+                    results.push({
+                        lineIndex: lineIndex | 0,
+                        startCol: startCol | 0,
+                        endCol: endCol | 0,
+                        message: message,
+                        suggestions: suggestions
+                    });
+                }
+
+                if (window.HarperBridge) window.HarperBridge.onResults(JSON.stringify(results));
+            } catch(e) {
+                console.error('Check error: ' + e.message);
+                if (window.HarperBridge) window.HarperBridge.onError('Check: ' + e.message);
+            }
+        };
+
+        initHarper();
+    </script>
+</head>
+<body></body>
+</html>

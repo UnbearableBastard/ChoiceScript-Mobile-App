@@ -99,10 +99,10 @@ class EditorActivityV3 : AppCompatActivity() {
     // ChoiceScript commands list for popup completion
     private val csCommands: List<String> = listOf(
         "achieve","achievement","check_achievements",
-        "choice","fake_choice","disable_reuse","allow_reuse","selectable_if",
+        "choice","fake_choice","disable_reuse","hide_reuse","allow_reuse","selectable_if","delay_break",
         "create","create_array","temp","temp_array","set","setref","delete","input_number","input_text","print","rand",
         "if","elseif","else","elsif","return","params",
-        "label","goto","goto_scene","goto_random_scene","gosub","gosub_scene","finish","ending","redirect_scene",
+        "label","goto","goto_scene","goto_random_scene","gosub","gosub_scene","finish","ending","redirect_scene","gotoref",
         "image","text_image","line_break","page_break","link","stat_chart","bold","italic","sound","script","scene_list","pause",
         "title","author","ifid","save_checkpoint","restore_checkpoint","comment","bug","looplimit","more_games",
         "share_this_game","show_password",
@@ -129,6 +129,9 @@ class EditorActivityV3 : AppCompatActivity() {
         val prefs = getSharedPreferences("editor_prefs", MODE_PRIVATE)
         currentFontSp = prefs.getFloat("font_sp", 18f).coerceIn(MIN_FONT_SP, MAX_FONT_SP)
         editor.setFontSizeSp(currentFontSp)
+
+        // Apply visible indents setting
+        editor.setVisibleIndents(prefs.getBoolean(SettingsActivity.KEY_VISIBLE_INDENTS, false))
 
         // Bottom bar IDs
         btnUndo = findViewById(R.id.btnUndo)

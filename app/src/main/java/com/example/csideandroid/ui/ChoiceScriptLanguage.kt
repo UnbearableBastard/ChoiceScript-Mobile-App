@@ -5,6 +5,7 @@ import io.github.rosemoe.sora.lang.analysis.AnalyzeManager
 import io.github.rosemoe.sora.lang.analysis.SimpleAnalyzeManager
 import io.github.rosemoe.sora.lang.styling.MappedSpans
 import io.github.rosemoe.sora.lang.styling.Styles
+import io.github.rosemoe.sora.widget.SymbolPairMatch
 import io.github.rosemoe.sora.widget.schemes.EditorColorScheme
 
 class ChoiceScriptLanguage(
@@ -36,15 +37,13 @@ class ChoiceScriptLanguage(
 
         override fun analyze(text: StringBuilder, delegate: Delegate<Any>): Styles {
             val colors = themeColors
-            val optionColor = colors?.optionColor
             val inlineVarColor = colors?.inlineVarColor
 
             val builder = MappedSpans.Builder(128)
-
             val lines = text.toString().split('\n')
+
             for (lineIndex in lines.indices) {
                 val line = lines[lineIndex]
-                // Always start each line as normal text
                 builder.addIfNeeded(lineIndex, 0, EditorColorScheme.TEXT_NORMAL.toLong())
 
                 // Highlight leading ChoiceScript commands: *command
@@ -72,10 +71,7 @@ class ChoiceScriptLanguage(
                     var i = 0
                     while (i < line.length && line[i].isWhitespace()) i++
                     if (i < line.length && line[i] == '#') {
-                        val style: Long = if (optionColor != null) EditorColorScheme.ANNOTATION.toLong()
-                        else EditorColorScheme.ANNOTATION.toLong()
-                        builder.addIfNeeded(lineIndex, i, style)
-                        // keep until end of line
+                        builder.addIfNeeded(lineIndex, i, EditorColorScheme.ANNOTATION.toLong())
                     }
                 }
 
@@ -84,7 +80,6 @@ class ChoiceScriptLanguage(
                     if (inlineVarColor != null) {
                         var searchFrom = 0
                         while (true) {
-                            // Look for "${", "$!{", "@{", or "@!{" patterns
                             val dollar    = line.indexOf("\${", searchFrom)
                             val dollarCap = line.indexOf("\$!{", searchFrom)
                             val at        = line.indexOf("@{", searchFrom)
@@ -93,8 +88,6 @@ class ChoiceScriptLanguage(
                                 .filter { it != -1 }
                                 .minOrNull() ?: -1
                             if (start == -1) break
-                            // Determine offset past the opening brace:
-                            //   $!{ or @!{ → 3 chars,  ${ or @{ → 2 chars
                             val offset = if (start + 1 < line.length && line[start + 1] == '!') 3 else 2
                             val end = line.indexOf('}', start + offset)
                             if (end == -1) break
@@ -115,6 +108,15 @@ class ChoiceScriptLanguage(
     private val analyzeManager: AnalyzeManager = ChoiceScriptAnalyzer()
 
     override fun getAnalyzeManager(): AnalyzeManager = analyzeManager
+
+    override fun getSymbolPairs(): SymbolPairMatch {
+        val pairs = SymbolPairMatch()
+        pairs.putPair('"', SymbolPairMatch.SymbolPair("\"", "\""))
+        pairs.putPair('(', SymbolPairMatch.SymbolPair("(", ")"))
+        pairs.putPair('[', SymbolPairMatch.SymbolPair("[", "]"))
+        pairs.putPair('{', SymbolPairMatch.SymbolPair("{", "}"))
+        return pairs
+    }
 
     fun setCommands(newCommands: List<String>) {
         commands = newCommands

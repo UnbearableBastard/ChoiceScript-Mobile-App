@@ -321,10 +321,23 @@ class ProjectsBrowserActivity : AppCompatActivity() {
             checkForUpdates()
             setSideMenuOpen(false)
         }
+
+        findViewById<View>(R.id.btnSettings)?.setOnClickListener {
+            setSideMenuOpen(false)
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
         pinnedGrid = findViewById(R.id.recyclerPinned)
         recentGrid = findViewById(R.id.recyclerRecent)
         allGrid = findViewById(R.id.recyclerAll)
         emptyView = findViewById(R.id.txtEmptyProjects)
+
+        // Apply navigation bar insets for landscape mode (right side cutoff)
+        val projectsScroll = findViewById<View>(R.id.projectsScroll)
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(projectsScroll) { v, insets ->
+            val navInsets = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
+            v.setPadding(v.paddingLeft, v.paddingTop, navInsets.right, navInsets.bottom)
+            insets
+        }
 
         // Section header buttons: tap to collapse/expand each list
         val btnPinnedHeader = findViewById<View>(R.id.txtPinnedHeader)
@@ -813,7 +826,7 @@ Editor & Error Checker
         projectMetaCache[name]?.let { return it.first to bottom }
 
         // Show last cached value instantly
-        prefs.getString("wc_top_$name", null)?.takeIf { it.isNotBlank() }?.let { top ->
+        prefs.getString("wc_top2_$name", null)?.takeIf { it.isNotBlank() }?.let { top ->
             val meta = top to bottom
             projectMetaCache[name] = meta
             return meta
@@ -866,8 +879,8 @@ Editor & Error Checker
                     val stats = scanTxtStats(proj)
                     val fp = "${stats.maxLastModified}|${stats.txtCount}"
 
-                    val fpKey = "wc_fp_$name"
-                    val topKey = "wc_top_$name"
+                    val fpKey = "wc_fp2_$name"
+                    val topKey = "wc_top2_$name"
                     val prevFp = prefs.getString(fpKey, null)
                     val cachedTop = prefs.getString(topKey, null)
 
@@ -881,9 +894,10 @@ Editor & Error Checker
                     }
 
                     // Changed: re-count words and update cache + prefs.
-                    val totalWords = WordCountUtil.countWordsInProject(proj, contentResolver)
-                    val wordsStr = nf.format(totalWords)
-                    val top = "${stats.txtCount} scenes — $wordsStr words"
+                    val counts = WordCountUtil.countWordsInProjectBoth(proj, contentResolver)
+                    val withStr = nf.format(counts.withCode)
+                    val withoutStr = nf.format(counts.withoutCode)
+                    val top = "${stats.txtCount} scenes — $withStr words\n$withoutStr words w/o code"
 
                     prefs.edit {
                         putString(fpKey, fp)
