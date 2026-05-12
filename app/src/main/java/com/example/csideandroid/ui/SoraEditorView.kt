@@ -889,17 +889,6 @@ class SoraEditorView @JvmOverloads constructor(
             editor.text.endBatchEdit()
         } finally { isApplyingAutoIndent = false }
 
-        // If inside a stat_chart block, temporarily disable cap sentences
-        // so the keyboard doesn't capitalize the first letter typed
-        if (isInsideStatChart(line)) {
-            editor.inputType = android.text.InputType.TYPE_CLASS_TEXT or
-                    android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
-            editor.post {
-                editor.inputType = android.text.InputType.TYPE_CLASS_TEXT or
-                        android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or
-                        android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
-            }
-        }
     }
 
     private fun applySelectedCommand(selectedWithStar: String) {
@@ -939,16 +928,20 @@ class SoraEditorView @JvmOverloads constructor(
         if (token.startsWith("*")) {
             val chosen = selectedWithStar.removePrefix("*")
             val already = token.substring(1)
-            // Delete the selected command and reinsert the full command in lowercase to bypass Gboard auto-cap
-            val cur = editor.cursor
-            val lineIdx = cur.leftLine
-            val colEnd = cur.leftColumn
-            val colStart = colEnd - token.length
-            if (colStart >= 0) {
-                editor.text.beginBatchEdit()
-                editor.text.delete(lineIdx, colStart, lineIdx, colEnd)
-                editor.text.insert(lineIdx, colStart, "*$chosen")
-                editor.text.endBatchEdit()
+            val suffix = if (chosen.startsWith(already, ignoreCase = true)) chosen.substring(already.length) else chosen
+            if (suffix.isNotEmpty()) editor.insertText(suffix.lowercase(), suffix.length)
+            // Fix any capitalization in the already-typed portion (e.g. Gboard Auto Caps)
+            if (already.isNotEmpty() && already != already.lowercase()) {
+                val cur = editor.cursor
+                val lineIdx = cur.leftLine
+                val colEnd = cur.leftColumn
+                val colStart = colEnd - suffix.length - already.length
+                if (colStart >= 0) {
+                    editor.text.beginBatchEdit()
+                    editor.text.delete(lineIdx, colStart, lineIdx, colStart + already.length)
+                    editor.text.insert(lineIdx, colStart, already.lowercase())
+                    editor.text.endBatchEdit()
+                }
             }
         } else {
             val trigger = token[0].toString(); val chosen = selectedWithStar
