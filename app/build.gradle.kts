@@ -15,7 +15,7 @@ android {
         targetSdk = 36
 
         versionCode = 8
-        versionName = "2.6"
+        versionName = "2.7.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -48,13 +48,13 @@ android {
 }
 
 dependencies {
-    implementation("io.github.Rosemoe.sora-editor:editor:0.23.6")
-    implementation("androidx.documentfile:documentfile:1.0.1")
+    implementation("io.github.rosemoe:editor:0.24.5")
+    implementation("androidx.documentfile:documentfile:1.1.0")
     testImplementation("junit:junit:4.13.2")
     implementation("org.nanohttpd:nanohttpd:2.3.1")
-    implementation("androidx.webkit:webkit:1.10.0")
+    implementation("androidx.webkit:webkit:1.15.0")
     implementation(libs.androidx.core.ktx)
-    implementation("androidx.core:core-ktx:1.10.1")
+    implementation("androidx.core:core-ktx:1.18.0")
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation(libs.androidx.activity)        // activity-ktx via version catalog
