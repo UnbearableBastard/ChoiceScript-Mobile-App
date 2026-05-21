@@ -9,6 +9,7 @@ import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
+import android.webkit.WebStorage
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.OnBackPressedCallback
@@ -106,7 +107,13 @@ class RunnerActivity : AppCompatActivity() {
             // Restore current page + history after rotation
             webView.restoreState(savedInstanceState)
         } else {
-            // First launch
+            // First launch — clear game state if "Reset on Launch" is enabled
+            val prefs = getSharedPreferences("editor_prefs", MODE_PRIVATE)
+            val resetOnLaunch = prefs.getBoolean("runner_reset_on_launch", true)
+            if (resetOnLaunch) {
+                WebStorage.getInstance().deleteAllData()
+                webView.clearCache(true)
+            }
             webView.loadUrl(
                 "https://appassets.androidplatform.net/assets/choicescript/web/mygame/index.html"
             )
