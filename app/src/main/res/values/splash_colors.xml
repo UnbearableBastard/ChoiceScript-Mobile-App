@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Matches the app icon's cream background exactly (#F1EBD9). Intentionally not tied to
+         day/night or the pb_accent UI palette, since this is the icon's fixed brand color. -->
+    <color name="splash_background">#F1EBD9</color>
+
+</resources>

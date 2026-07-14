@@ -1156,7 +1156,7 @@ Scene.prototype.finish = function finish(buttonName) {
       );
       return;
     }
-    var nextSceneName = this.nav && nav.nextSceneName(this.name);
+    var nextSceneName = this.nav && this.nav.nextSceneName(this.name);
     // if there are no more scenes, then just halt
     if (!nextSceneName) {
         if (!this.secondaryMode) this.ending();
@@ -1610,7 +1610,7 @@ Scene.prototype.defineArray = function defineArray(command, line) {
   }
 
   if (stack.length) next();
-  
+
   if (!stack.length) {
     // Use first default value for all creations
     for (i = 0; i < length; i++) {
@@ -2114,7 +2114,7 @@ Scene.prototype.finish_advertisement = function finishAdvertisement(line) {
   showFullScreenAdvertisementButton("Watch an Ad for the Next Chapter", function () {
     self.finish("");
   }, function () {
-    var nextSceneName = self.nav && nav.nextSceneName(self.name);
+    var nextSceneName = self.nav && self.nav.nextSceneName(self.name);
     var scene = new Scene(nextSceneName, self.stats, self.nav, { debugMode: self.debugMode, secondaryMode: self.secondaryMode });
     scene.resetPage();
   });
@@ -4548,9 +4548,9 @@ Scene.prototype.achieve = function scene_achieve(name) {
 Scene.prototype.check_achievements = function scene_checkAchievements() {
   var self = this;
   function callback(immediately) {
-    for (var achievement in nav.achievements) {
+    for (var achievement in self.nav.achievements) {
 
-      self.temps["choice_achieved_"+achievement] = nav.achieved.hasOwnProperty(achievement);
+      self.temps["choice_achieved_"+achievement] = self.nav.achieved.hasOwnProperty(achievement);
     }
     if (!immediately) {
       self.finished = false;
@@ -4950,7 +4950,7 @@ Scene.operators = {
     "-": function subtract(v1,v2,line,sceneObj) { var name = null; if (sceneObj) name = sceneObj.name; return num(v1,line,name) - num(v2,line,name); },
     "*": function multiply(v1,v2,line,sceneObj) { var name = null; if (sceneObj) name = sceneObj.name; return num(v1,line,name) * num(v2,line,name); },
     "/": function divide(v1,v2,line,sceneObj) {
-      var name = null; if (sceneObj) name = sceneObj.name; 
+      var name = null; if (sceneObj) name = sceneObj.name;
       v2 = num(v2, line, name);
       if (v2 === 0) throw new Error(name+" line "+line+": can't divide by zero");
       return num(v1,line,name) / num(v2,line,name);
@@ -5003,24 +5003,24 @@ Scene.operators = {
         }
     },
     "%-": function fairSubtract(v1, v2, line, sceneObj) {
-        var name = null; if (sceneObj) name = sceneObj.name; 
+        var name = null; if (sceneObj) name = sceneObj.name;
         v2 = num(v2,line,name);
         return Scene.operators["%+"](v1,0-v2,line,sceneObj);
     },
     "=": function equals(v1,v2) { return v1 == v2 || String(v1) == String(v2); },
     "<": function lessThan(v1,v2,line,sceneObj) {
-        var name = null; if (sceneObj) name = sceneObj.name; 
+        var name = null; if (sceneObj) name = sceneObj.name;
         return num(v1,line,name) < num(v2,line,name); },
     ">": function greaterThan(v1,v2,line,sceneObj) { var name = null; if (sceneObj) name = sceneObj.name; return num(v1,line,name) > num(v2,line,name); },
     "<=": function lessThanOrEquals(v1,v2,line,sceneObj) { var name = null; if (sceneObj) name = sceneObj.name; return num(v1,line,name) <= num(v2,line,name); },
     ">=": function greaterThanOrEquals(v1,v2,line,sceneObj) { var name = null; if (sceneObj) name = sceneObj.name; return num(v1,line,name) >= num(v2,line,name); },
     "!=": function notEquals(v1,v2) { return v1 != v2; },
     "and": function and(v1, v2, line, sceneObj) {
-        var name = null; if (sceneObj) name = sceneObj.name; 
+        var name = null; if (sceneObj) name = sceneObj.name;
         return bool(v1,line,name) && bool(v2,line,name);
     },
     "or": function or(v1, v2, line, sceneObj) {
-        var name = null; if (sceneObj) name = sceneObj.name; 
+        var name = null; if (sceneObj) name = sceneObj.name;
         return bool(v1,line,name) || bool(v2,line,name);
     },
     "modulo": function modulo(v1,v2,line,sceneObj) { var name = null; if (sceneObj) name = sceneObj.name; return num(v1,line,name) % num(v2,line,name); },

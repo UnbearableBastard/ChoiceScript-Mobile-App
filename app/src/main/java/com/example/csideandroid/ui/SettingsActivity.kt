@@ -1,7 +1,6 @@
 package com.example.csideandroid.ui
 
 import android.os.Bundle
-import android.widget.Button
 import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -17,6 +16,7 @@ class SettingsActivity : AppCompatActivity() {
         const val KEY_VISIBLE_INDENTS = "visible_indents"
         const val KEY_SPELL_CHECK = "spell_check_enabled"
         const val KEY_RESET_ON_LAUNCH = "runner_reset_on_launch"
+        const val KEY_AUTO_CLOSE_BRACKETS = "auto_close_brackets"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,7 +33,7 @@ class SettingsActivity : AppCompatActivity() {
 
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
 
-        findViewById<Button>(R.id.btnSettingsBack).setOnClickListener { finish() }
+        findViewById<LinearLayout>(R.id.btnSettingsBack).setOnClickListener { finish() }
 
         val switchVisibleIndents = findViewById<SwitchMaterial>(R.id.switchVisibleIndents)
         switchVisibleIndents.isChecked = prefs.getBoolean(KEY_VISIBLE_INDENTS, true)
@@ -51,6 +51,12 @@ class SettingsActivity : AppCompatActivity() {
         switchResetOnLaunch.isChecked = prefs.getBoolean(KEY_RESET_ON_LAUNCH, true)
         switchResetOnLaunch.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit { putBoolean(KEY_RESET_ON_LAUNCH, isChecked) }
+        }
+
+        val switchAutoCloseBrackets = findViewById<SwitchMaterial>(R.id.switchAutoCloseBrackets)
+        switchAutoCloseBrackets.isChecked = prefs.getBoolean(KEY_AUTO_CLOSE_BRACKETS, true)
+        switchAutoCloseBrackets.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit { putBoolean(KEY_AUTO_CLOSE_BRACKETS, isChecked) }
         }
     }
 }

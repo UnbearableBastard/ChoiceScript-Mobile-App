@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Projects browser -->
+    <dimen name="pb_card_corner_radius">18dp</dimen>
+    <dimen name="pb_nav_item_corner_radius">14dp</dimen>
 
     <!-- Editor -->
 

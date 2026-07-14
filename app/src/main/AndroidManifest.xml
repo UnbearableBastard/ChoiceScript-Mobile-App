@@ -35,7 +35,8 @@
         <!-- Start Screen Activity -->
         <activity
             android:name=".ui.MainMenuActivity"
-            android:exported="true">
+            android:exported="true"
+            android:theme="@style/Theme.App.Starting">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -47,9 +48,8 @@
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:windowSoftInputMode="adjustResize"/>
 
-        <activity android:name=".ui.ProjectsBrowserActivity" android:exported="false" />
+        <activity android:name=".ui.ProjectsBrowserActivity" android:exported="false" android:configChanges="orientation|screenSize|screenLayout|keyboardHidden" />
         <activity android:name=".ui.FirstRunActivity" android:exported="false" />
-        <activity android:name=".ui.ProjectFilesActivity" android:exported="false" />
 
         <!-- RunnerActivity launches a WebView that runs the ChoiceScript engine -->
         <activity

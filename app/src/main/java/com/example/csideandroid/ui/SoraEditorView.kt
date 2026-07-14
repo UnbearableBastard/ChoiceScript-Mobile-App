@@ -663,6 +663,10 @@ class SoraEditorView @JvmOverloads constructor(
         editor.post { updateCommandPopup() }
     }
 
+    fun setAutoCloseBrackets(enabled: Boolean) {
+        editor.props.symbolPairAutoCompletion = enabled
+    }
+
     fun setTheme(themeName: String) {
         val scheme: EditorColorScheme = when (themeName.lowercase()) {
             "darcula", "monokai", "dark", "monokai-dark" -> SchemeDarcula()

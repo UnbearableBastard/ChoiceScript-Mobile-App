@@ -2,7 +2,8 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/pb_bg">
 
     <LinearLayout
         android:id="@+id/rootProjectsBrowser"
@@ -13,8 +14,8 @@
         <!-- Collapsible side menu -->
         <LinearLayout
             android:id="@+id/sideMenu"
-            android:background="?attr/colorSurfaceVariant"
-            android:layout_width="0dp"
+            android:background="@color/pb_sidebar_bg"
+            android:layout_width="1dp"
             android:layout_height="match_parent"
             android:orientation="vertical"
             android:visibility="visible">
@@ -25,54 +26,181 @@
                 android:fillViewport="true">
 
                 <LinearLayout
+                    android:id="@+id/sideMenuContent"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="40dp">
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingTop="28dp"
+                    android:paddingBottom="24dp">
 
-                    <Button
+                    <!-- Brand -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:layout_marginBottom="24dp"
+                        android:text="ChoiceScript Editor"
+                        android:textColor="@color/pb_text_primary"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:fontFamily="monospace" />
+
+                    <!-- Primary action -->
+                    <LinearLayout
                         android:id="@+id/btnNewProject"
                         android:layout_width="match_parent"
-                        android:layout_height="40dp"
-                        android:text="+ Create" />
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:background="@drawable/bg_create_button"
+                        android:paddingStart="14dp"
+                        android:paddingEnd="14dp"
+                        android:paddingTop="12dp"
+                        android:paddingBottom="12dp"
+                        android:clickable="true"
+                        android:focusable="true">
 
-                    <Button
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:src="@drawable/ic_add_24"
+                            app:tint="@color/pb_on_accent"
+                            android:contentDescription="@null" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp"
+                            android:text="New Project"
+                            android:textColor="@color/pb_on_accent"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginTop="20dp"
+                        android:layout_marginBottom="12dp"
+                        android:background="@color/pb_border" />
+
+                    <!-- Tutorial -->
+                    <LinearLayout
                         android:id="@+id/btnTutorial"
-                        android:layout_width="match_parent"
-                        android:layout_height="40dp"
-                        android:layout_marginTop="8dp"
-                        android:text="Tutorial" />
+                        style="@style/PbSidebarNavItem">
 
-                    <Button
+                        <ImageView
+                            style="@style/PbSidebarNavIcon"
+                            android:src="@drawable/ic_book_24" />
+
+                        <TextView
+                            style="@style/PbSidebarNavLabel"
+                            android:text="Tutorial" />
+                    </LinearLayout>
+
+                    <!-- Help -->
+                    <LinearLayout
                         android:id="@+id/btnHelp"
-                        android:layout_width="match_parent"
-                        android:layout_height="40dp"
-                        android:layout_marginTop="8dp"
-                        android:text="Help" />
-                    <Button
-                        android:id="@+id/btnRelocate"
-                        android:layout_width="match_parent"
-                        android:layout_height="40dp"
-                        android:layout_marginTop="8dp"
-                        android:text="Reselect" />
+                        style="@style/PbSidebarNavItem">
 
-                    <Button
+                        <ImageView
+                            style="@style/PbSidebarNavIcon"
+                            android:src="@drawable/ic_help_24" />
+
+                        <TextView
+                            style="@style/PbSidebarNavLabel"
+                            android:text="Help" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginTop="12dp"
+                        android:layout_marginBottom="12dp"
+                        android:background="@color/pb_border" />
+
+                    <!-- Reselect -->
+                    <LinearLayout
+                        android:id="@+id/btnRelocate"
+                        style="@style/PbSidebarNavItem">
+
+                        <ImageView
+                            style="@style/PbSidebarNavIcon"
+                            android:src="@drawable/ic_folder_24" />
+
+                        <TextView
+                            style="@style/PbSidebarNavLabel"
+                            android:text="Reselect" />
+                    </LinearLayout>
+
+                    <!-- Check for updates -->
+                    <LinearLayout
                         android:id="@+id/btnCheckUpdates"
+                        style="@style/PbSidebarNavItem">
+
+                        <ImageView
+                            style="@style/PbSidebarNavIcon"
+                            android:src="@drawable/ic_refresh_24" />
+
+                        <TextView
+                            style="@style/PbSidebarNavLabel"
+                            android:text="Check for updates"
+                            android:maxLines="2"
+                            android:ellipsize="none"
+                            android:singleLine="false" />
+                    </LinearLayout>
+
+                    <!-- Settings -->
+                    <LinearLayout
+                        android:id="@+id/btnSettings"
+                        style="@style/PbSidebarNavItem">
+
+                        <ImageView
+                            style="@style/PbSidebarNavIcon"
+                            android:src="@drawable/ic_settings_24" />
+
+                        <TextView
+                            style="@style/PbSidebarNavLabel"
+                            android:text="Settings" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginTop="12dp"
+                        android:layout_marginBottom="12dp"
+                        android:background="@color/pb_border" />
+
+                    <!-- Dark mode override -->
+                    <LinearLayout
+                        android:id="@+id/rowDarkMode"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:minHeight="40dp"
-                        android:layout_marginTop="8dp"
-                        android:text="Check for updates"
-                        android:singleLine="false"
-                        android:maxLines="2"
-                        android:ellipsize="none" />
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="10dp"
+                        android:paddingTop="8dp"
+                        android:paddingBottom="8dp">
 
-                    <Button
-                        android:id="@+id/btnSettings"
-                        android:layout_width="match_parent"
-                        android:layout_height="40dp"
-                        android:layout_marginTop="8dp"
-                        android:text="Settings" />
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Dark Mode"
+                            android:textColor="@color/pb_text_primary"
+                            android:textSize="14sp" />
+
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchDarkMode"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            app:thumbTint="@color/pb_switch_thumb"
+                            app:trackTint="@color/pb_switch_track" />
+
+                    </LinearLayout>
 
                 </LinearLayout>
 
@@ -85,10 +213,12 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
+            android:background="@color/pb_bg"
             android:clipToPadding="false"
             android:paddingBottom="32dp">
 
             <LinearLayout
+                android:id="@+id/projectsContent"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
@@ -97,25 +227,26 @@
                 <androidx.constraintlayout.widget.ConstraintLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:minHeight="86dp">
+                    android:minHeight="72dp">
 
                     <ImageButton
                         android:id="@+id/btnMenuToggle"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:layout_width="42dp"
+                        android:layout_height="42dp"
+                        android:background="@drawable/bg_icon_button_circle"
                         android:contentDescription="Open menu"
+                        android:padding="10dp"
                         app:srcCompat="@drawable/ic_menu_24"
                         app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintTop_toTopOf="parent"
                         app:layout_constraintBottom_toBottomOf="parent"
-                        app:tint="?attr/colorControlNormal" />
+                        app:tint="@color/pb_text_primary" />
 
                     <!-- Right spacer so the title stays truly centered -->
                     <View
                         android:id="@+id/rightSpacer"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="42dp"
+                        android:layout_height="42dp"
                         app:layout_constraintEnd_toEndOf="parent"
                         app:layout_constraintTop_toTopOf="parent"
                         app:layout_constraintBottom_toBottomOf="parent" />
@@ -125,8 +256,9 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:text="Your Projects"
-                        android:textSize="30sp"
+                        android:textSize="24sp"
                         android:textStyle="bold"
+                        android:textColor="@color/pb_text_primary"
                         android:maxLines="2"
                         android:textAlignment="center"
                         app:layout_constraintStart_toStartOf="parent"
@@ -138,80 +270,104 @@
 
                 </androidx.constraintlayout.widget.ConstraintLayout>
 
-                <Button
+                <LinearLayout
                     android:id="@+id/txtPinnedHeader"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingTop="24dp"
-                    android:paddingBottom="8dp"
-                    android:text="Pinned"
-                    android:textStyle="bold"
-                    android:background="?attr/selectableItemBackground"
-                    android:textAllCaps="false"
-                    android:gravity="start|center_vertical"
-                    android:minHeight="0dp"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:textColor="?attr/colorPrimary"
-                    />
+                    style="@style/PbSectionHeader">
+
+                    <FrameLayout
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:background="@drawable/bg_section_header_icon">
+
+                        <ImageView
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_star_filled"
+                            app:tint="@color/pb_gold"
+                            android:contentDescription="@null" />
+                    </FrameLayout>
+
+                    <TextView
+                        style="@style/PbSectionHeaderLabel"
+                        android:text="Pinned" />
+
+                    <ImageView
+                        style="@style/PbSectionHeaderChevron" />
+                </LinearLayout>
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/recyclerPinned"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:nestedScrollingEnabled="false"
-                    app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
-                    app:spanCount="2" />
+                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
 
-                <Button
+                <LinearLayout
                     android:id="@+id/txtRecentHeader"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingTop="24dp"
-                    android:paddingBottom="8dp"
-                    android:text="Recent"
-                    android:textStyle="bold"
-                    android:background="?attr/selectableItemBackground"
-                    android:textAllCaps="false"
-                    android:gravity="start|center_vertical"
-                    android:minHeight="0dp"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:textColor="?attr/colorPrimary"
-                    />
+                    style="@style/PbSectionHeader">
+
+                    <FrameLayout
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:background="@drawable/bg_section_header_icon">
+
+                        <ImageView
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_history_24"
+                            app:tint="@color/pb_accent"
+                            android:contentDescription="@null" />
+                    </FrameLayout>
+
+                    <TextView
+                        style="@style/PbSectionHeaderLabel"
+                        android:text="Recent" />
+
+                    <ImageView
+                        style="@style/PbSectionHeaderChevron" />
+                </LinearLayout>
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/recyclerRecent"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:nestedScrollingEnabled="false"
-                    app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
-                    app:spanCount="2" />
+                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
 
-                <Button
+                <LinearLayout
                     android:id="@+id/txtAllHeader"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingTop="24dp"
-                    android:paddingBottom="8dp"
-                    android:text="All Projects"
-                    android:textStyle="bold"
-                    android:background="?attr/selectableItemBackground"
-                    android:textAllCaps="false"
-                    android:gravity="start|center_vertical"
-                    android:minHeight="0dp"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:textColor="?attr/colorPrimary"
-                    />
+                    style="@style/PbSectionHeader">
+
+                    <FrameLayout
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:background="@drawable/bg_section_header_icon">
+
+                        <ImageView
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_grid_24"
+                            app:tint="@color/pb_accent"
+                            android:contentDescription="@null" />
+                    </FrameLayout>
+
+                    <TextView
+                        style="@style/PbSectionHeaderLabel"
+                        android:text="All Projects" />
+
+                    <ImageView
+                        style="@style/PbSectionHeaderChevron" />
+                </LinearLayout>
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/recyclerAll"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:nestedScrollingEnabled="false"
-                    app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
-                    app:spanCount="2" />
+                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
 
                 <TextView
                     android:id="@+id/txtEmptyProjects"
@@ -220,6 +376,7 @@
                     android:gravity="center"
                     android:padding="24dp"
                     android:text="No projects yet."
+                    android:textColor="@color/pb_text_secondary"
                     android:visibility="gone" />
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
@@ -227,12 +384,12 @@
     </LinearLayout>
 
 
-    <!-- Full-width top bar (on top of everything) -->
+    <!-- Height set at runtime to match the status bar / cutout inset -->
     <View
         android:id="@+id/topFillBar"
         android:layout_width="match_parent"
-        android:layout_height="32dp"
-        android:background="#FF000000"
+        android:layout_height="0dp"
+        android:background="@color/pb_bg_top"
         android:layout_gravity="top"
         android:elevation="8dp" />
 
@@ -242,7 +399,7 @@
         android:id="@+id/menuScrim"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@android:color/transparent"
+        android:background="@color/pb_scrim"
         android:clickable="true"
         android:focusable="true"
         android:visibility="gone" />

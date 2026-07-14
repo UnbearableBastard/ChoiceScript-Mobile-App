@@ -1,5 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Themes -->
-
+    <!-- Projects Browser -->
+    <color name="pb_bg">#F5F6F9</color>
+    <color name="pb_bg_top">#5B6070</color>
+    <color name="pb_sidebar_bg">#EFF0F4</color>
+    <color name="pb_surface">#FFFFFF</color>
+    <color name="pb_surface_alt">#F3F4F8</color>
+    <color name="pb_border">#E1E3EA</color>
+    <color name="pb_accent">#6E5FEA</color>
+    <color name="pb_accent_dim">#ECE9FC</color>
+    <color name="pb_on_accent">#FFFFFF</color>
+    <color name="pb_text_primary">#14161B</color>
+    <color name="pb_text_secondary">#5B6070</color>
+    <color name="pb_text_tertiary">#8A90A2</color>
+    <color name="pb_gold">#B9860B</color>
+    <color name="pb_scrim">#66000000</color>
 </resources>

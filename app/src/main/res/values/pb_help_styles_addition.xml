@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Bullet row inside a Help dialog section card -->
+    <style name="PbHelpBullet">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">@color/pb_text_secondary</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:lineSpacingExtra">1dp</item>
+        <item name="android:layout_marginBottom">8dp</item>
+    </style>
+
+    <style name="PbHelpBulletLast" parent="PbHelpBullet">
+        <item name="android:layout_marginBottom">0dp</item>
+    </style>
+
+</resources>

@@ -1,17 +1,20 @@
 package com.example.csideandroid.ui.model
 
-import com.example.csideandroid.core.Project
+import androidx.documentfile.provider.DocumentFile
 import java.io.File
 
-// One collapsible group per project
+// One collapsible group per project.
 data class ProjectGroup(
-    val project: Project,
-    val scenes: List<File>,
-    var expanded: Boolean = false
+    val projectFile: File,
+    val projectDoc: DocumentFile,
+    var scenesDoc: DocumentFile? = null,
+    var files: MutableList<DocumentFile> = mutableListOf(),
+    var expanded: Boolean = false,
+    var filesLoaded: Boolean = false,
+    var loading: Boolean = false
 )
 
-// Rows for the list: a project header or a scene entry
 sealed class RowItem {
     data class Header(val group: ProjectGroup) : RowItem()
-    data class Scene(val group: ProjectGroup, val file: File) : RowItem()
+    data class FileRow(val group: ProjectGroup, val doc: DocumentFile) : RowItem()
 }

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Themes -->
+
+    <!-- Projects Browser dark palette -->
+    <color name="pb_bg">#0D0F14</color>
+    <color name="pb_bg_top">#12141B</color>
+    <color name="pb_sidebar_bg">#0A0B10</color>
+    <color name="pb_surface">#171A22</color>
+    <color name="pb_surface_alt">#1D212B</color>
+    <color name="pb_border">#242835</color>
+    <color name="pb_accent">#7C6BFF</color>
+    <color name="pb_accent_dim">#241F3D</color>
+    <color name="pb_on_accent">#FFFFFF</color>
+    <color name="pb_text_primary">#F2F3F7</color>
+    <color name="pb_text_secondary">#8A90A2</color>
+    <color name="pb_text_tertiary">#565C6C</color>
+    <color name="pb_gold">#F0B429</color>
+    <color name="pb_scrim">#99000000</color>
+</resources>

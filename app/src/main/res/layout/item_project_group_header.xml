@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:layout_marginTop="@dimen/project_card_margin"
+    android:background="@drawable/bg_project_group"
+    android:clipToOutline="true">
+
+    <!-- Header row: tap to expand/collapse, drag handle to reorder projects -->
+    <LinearLayout
+        android:id="@+id/headerRow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="14dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:foreground="?attr/selectableItemBackground">
+
+        <FrameLayout
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:layout_gravity="top"
+            android:background="@drawable/bg_section_header_icon">
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_document_24"
+                app:tint="@color/pb_accent"
+                android:contentDescription="@null" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:paddingStart="12dp"
+            android:paddingEnd="8dp">
+
+            <TextView
+                android:id="@+id/txtCardName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Project_Name"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:textColor="@color/pb_text_primary"
+                android:maxLines="1"
+                android:ellipsize="end"/>
+
+            <TextView
+                android:id="@+id/txtCardMeta1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="12 scenes – 4 assets"
+                android:textSize="12sp"
+                android:textColor="@color/pb_text_secondary"
+                android:maxLines="2"
+                android:ellipsize="end"
+                android:paddingTop="3dp"/>
+
+            <TextView
+                android:id="@+id/txtCardMeta2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Last opened 2d ago"
+                android:textSize="12sp"
+                android:textColor="@color/pb_text_secondary"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:paddingTop="1dp"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="top">
+
+            <ImageButton
+                android:id="@+id/btnPin"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:padding="8dp"
+                android:contentDescription="@string/pin"
+                android:background="@drawable/bg_icon_button_circle"
+                android:focusable="true"
+                android:clickable="true"
+                app:srcCompat="@drawable/ic_star_outline"
+                app:tint="@null" />
+
+            <ImageView
+                android:id="@+id/imgChevron"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="2dp"
+                android:padding="6dp"
+                android:src="@drawable/ic_chevron_right_24"
+                android:rotation="90"
+                app:tint="@color/pb_text_tertiary"
+                android:contentDescription="@null" />
+
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/dragHandleHeader"
+            android:layout_width="22dp"
+            android:layout_height="38dp"
+            android:layout_gravity="top"
+            android:layout_marginStart="4dp"
+            android:src="@drawable/ic_grip_24"
+            app:tint="@color/pb_text_tertiary"
+            android:contentDescription="@null" />
+
+    </LinearLayout>
+
+    <!-- Inline action row: visible only when expanded -->
+    <LinearLayout
+        android:id="@+id/actionRow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp"
+        android:paddingBottom="4dp"
+        android:visibility="gone">
+
+        <LinearLayout android:id="@+id/actionNew" style="@style/PbCardAction">
+            <ImageView style="@style/PbCardActionIcon" android:src="@drawable/ic_add_24" />
+            <TextView style="@style/PbCardActionLabel" android:text="New" />
+        </LinearLayout>
+
+        <LinearLayout android:id="@+id/actionPlay" style="@style/PbCardAction">
+            <ImageView style="@style/PbCardActionIcon" android:src="@drawable/ic_run_play_24" />
+            <TextView style="@style/PbCardActionLabel" android:text="Play" />
+        </LinearLayout>
+
+        <LinearLayout android:id="@+id/actionTest" style="@style/PbCardAction">
+            <ImageView style="@style/PbCardActionIcon" android:src="@drawable/ic_flask_24" />
+            <TextView style="@style/PbCardActionLabel" android:text="Test" />
+        </LinearLayout>
+
+        <LinearLayout android:id="@+id/actionCompile" style="@style/PbCardAction">
+            <ImageView style="@style/PbCardActionIcon" android:src="@drawable/ic_file_export_24" />
+            <TextView style="@style/PbCardActionLabel" android:text="Compile" />
+        </LinearLayout>
+
+        <LinearLayout android:id="@+id/actionMore" style="@style/PbCardAction">
+            <ImageView style="@style/PbCardActionIcon" android:src="@drawable/ic_dots_24" />
+            <TextView style="@style/PbCardActionLabel" android:text="More" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- Loading indicator for lazy file load -->
+    <TextView
+        android:id="@+id/txtFilesLoading"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Loading files…"
+        android:textSize="12sp"
+        android:textColor="@color/pb_text_secondary"
+        android:paddingStart="18dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="12dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/txtFilesEmpty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="No files in this project yet."
+        android:textSize="12sp"
+        android:textColor="@color/pb_text_secondary"
+        android:paddingStart="18dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="12dp"
+        android:visibility="gone" />
+
+</LinearLayout>

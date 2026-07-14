@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/bg_project_group"
+    android:elevation="4dp">
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="20dp">
+
+        <FrameLayout
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="@drawable/bg_section_header_icon">
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_help_24"
+                app:tint="@color/pb_accent"
+                android:contentDescription="@null" />
+        </FrameLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:text="Help"
+            android:textSize="19sp"
+            android:textStyle="bold"
+            android:textColor="@color/pb_text_primary" />
+
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/pb_border" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="This app helps you manage your ChoiceScript projects and playtest them before publishing."
+                android:textSize="14sp"
+                android:textColor="@color/pb_text_secondary"
+                android:layout_marginBottom="16dp" />
+
+            <!-- Section: Getting Started -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/bg_help_section"
+                android:padding="14dp"
+                android:layout_marginBottom="12dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="8dp">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Getting Started"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/pb_text_primary" />
+                </LinearLayout>
+
+                <TextView style="@style/PbHelpBullet"
+                    android:text="•  Use the hamburger menu to create a new project, or paste an existing one into the &quot;ChoiceScript Projects&quot; folder." />
+
+                <TextView style="@style/PbHelpBullet"
+                    android:text="•  New to ChoiceScript? Tap &quot;Tutorial&quot; in the menu for a beginner walkthrough." />
+
+                <TextView style="@style/PbHelpBullet"
+                    android:text="•  Picked the wrong folder by mistake? Tap &quot;Reselect&quot; in the menu." />
+
+                <TextView style="@style/PbHelpBullet"
+                    android:text="•  Tap a project card to expand it — drag files to reorder, and use New / Play / Test / Compile right on the card." />
+
+                <TextView style="@style/PbHelpBullet"
+                    android:text="•  Long-press a project (or its &quot;More&quot; menu) to rename, delete, or upload it." />
+
+                <TextView style="@style/PbHelpBulletLast"
+                    android:text="•  Dismissed this popup by accident? Tap &quot;Help&quot; in the menu any time to bring it back." />
+
+            </LinearLayout>
+
+            <!-- Section: Project Sections -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/bg_help_section"
+                android:padding="14dp"
+                android:layout_marginBottom="12dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="8dp">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Project Sections"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/pb_text_primary" />
+                </LinearLayout>
+
+                <TextView style="@style/PbHelpBullet"
+                    android:text="•  Pinned — pin your most-used projects so they stay at the top." />
+
+                <TextView style="@style/PbHelpBullet"
+                    android:text="•  Recent — shows the projects you opened most recently." />
+
+                <TextView style="@style/PbHelpBullet"
+                    android:text="•  All Projects — everything in your ChoiceScript Projects folder." />
+
+                <TextView style="@style/PbHelpBulletLast"
+                    android:text="•  Tap a section header to collapse it. Hold and drag a card to reorder it within its section." />
+
+            </LinearLayout>
+
+            <!-- Section: Editor & Error Checker -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/bg_help_section"
+                android:padding="14dp"
+                android:layout_marginBottom="4dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="8dp">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Editor &amp; Error Checker"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/pb_text_primary" />
+                </LinearLayout>
+
+                <TextView style="@style/PbHelpBullet"
+                    android:text="•  Use Test / Compile on an expanded project card to check for errors or export a playable file. Same actions live in the editor's ⋮ menu." />
+
+                <TextView style="@style/PbHelpBullet"
+                    android:text="•  The checker scans every file listed in *scene_list, so it can occasionally report false positives." />
+
+                <TextView style="@style/PbHelpBullet"
+                    android:text="•  Fix errors in the order they appear — later ones often disappear once the earlier ones are corrected." />
+
+                <TextView style="@style/PbHelpBullet"
+                    android:text="•  Example: a misspelled or badly indented *choice will throw errors for everything nested under it." />
+
+                <TextView style="@style/PbHelpBulletLast"
+                    android:text="•  Press and hold the bar above the editor to open &quot;Edit Theme&quot; and customize its look." />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </ScrollView>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="14dp"
+        android:background="@color/pb_border" />
+
+    <!-- Footer: "do not show again" + OK -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="14dp">
+
+        <CheckBox
+            android:id="@+id/checkHideHelp"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Don't show this again"
+            android:textSize="13sp"
+            android:textColor="@color/pb_text_secondary"
+            android:buttonTint="@color/pb_accent" />
+
+        <TextView
+            android:id="@+id/btnHelpOk"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="OK"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:textColor="@color/pb_accent"
+            android:background="@drawable/bg_nav_item"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
+            android:clickable="true"
+            android:focusable="true" />
+
+    </LinearLayout>
+
+</LinearLayout>

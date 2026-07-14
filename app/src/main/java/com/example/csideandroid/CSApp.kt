@@ -6,12 +6,23 @@ import android.os.Bundle
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.appcompat.app.AppCompatDelegate
 
 // Applies a consistent status bar background across the whole app and prevents UI from overlapping the system status icons.
 class CSApp : Application() {
 
+    companion object {
+        const val PREFS_NAME = "app_prefs"
+        const val KEY_NIGHT_MODE = "night_mode_override"
+    }
+
     override fun onCreate() {
         super.onCreate()
+
+        // Apply the saved light/dark override (if any) before any screen opens.
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val savedMode = prefs.getInt(KEY_NIGHT_MODE, AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+        AppCompatDelegate.setDefaultNightMode(savedMode)
 
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {

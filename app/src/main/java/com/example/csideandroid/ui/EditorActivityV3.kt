@@ -133,6 +133,9 @@ class EditorActivityV3 : AppCompatActivity() {
         // Apply visible indents setting
         editor.setVisibleIndents(prefs.getBoolean(SettingsActivity.KEY_VISIBLE_INDENTS, false))
 
+        // Apply auto-close brackets/quotes setting
+        editor.setAutoCloseBrackets(prefs.getBoolean(SettingsActivity.KEY_AUTO_CLOSE_BRACKETS, true))
+
         // Bottom bar IDs
         btnUndo = findViewById(R.id.btnUndo)
         btnRedo = findViewById(R.id.btnRedo)
@@ -390,7 +393,7 @@ class EditorActivityV3 : AppCompatActivity() {
         }.onSuccess { content ->
             editor.setTextContent(content)
 
-            // Apply any pending line-jump request (e.g., from ProjectFilesActivity error checker).
+            // Apply any pending line-jump request (e.g., from the project error checker / Quicktest).
             pendingGotoLine0?.let { targetLine0 ->
                 pendingGotoLine0 = null
                 val delays = longArrayOf(0L, 40L, 120L, 250L, 450L, 700L, 1000L)

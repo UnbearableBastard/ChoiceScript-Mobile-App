@@ -2,183 +2,278 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>ChoiceScript Tutorial – Part 6 (Scenes &amp; Scene List)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ChoiceScript Tutorial – Part 6 (Scenes & Scene List)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Newsreader:ital,wght@0,400;0,600;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-body {
-  font-family: sans-serif;
-  padding: 16px;
-  padding-bottom: 80px;
-  line-height: 1.6;
-  background-color: #121212;
-  color: #e0e0e0;
+:root {
+  --paper: #F4F3EF;
+  --paper-inset: #FFFFFF;
+  --ink: #1B1B18;
+  --ink-soft: #55534B;
+  --rule: #D9D6CB;
+  --red: #A8341F;
+  --red-soft: #F1E0DA;
+  --radius: 2px;
 }
-pre {
-  background: #1e1e1e;
-  padding: 12px;
-  border-radius: 8px;
-  overflow-x: auto;
-}
-h1, h2, h3 { color: #80cbc4; }
-a { color: #82b1ff; text-decoration: none; }
-a:hover { text-decoration: underline; }
-code { font-family: monospace; }
+
+* { box-sizing: border-box; }
 
 body {
   margin: 0;
   padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Newsreader', Georgia, serif;
+  font-size: 17px;
+  line-height: 1.75;
 }
-.layout {
-  display: flex;
-  min-height: 100vh;
-}
-.sidebar {
-  width: 260px;
-  flex-shrink: 0;
-  background: #181818;
-  border-right: 1px solid #2a2a2a;
-  padding: 20px 16px;
-  box-sizing: border-box;
+
+a { color: var(--red); }
+a:hover { text-decoration: none; }
+
+.masthead {
   position: sticky;
   top: 0;
-  height: 100vh;
-  overflow-y: auto;
+  z-index: 10;
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+  padding: calc(14px + env(safe-area-inset-top)) 20px 0;
 }
-.sidebar h2 {
-  margin-top: 0;
-  margin-bottom: 16px;
-  font-size: 1.1rem;
-}
-.sidebar a {
-  display: block;
-  padding: 8px 10px;
-  border-radius: 8px;
-  margin-bottom: 6px;
-}
-.sidebar a.active {
-  background: #263238;
-  color: #80cbc4;
-}
-.content {
-  flex: 1;
-  padding: 16px;
-  padding-bottom: 80px;
-  box-sizing: border-box;
-  min-width: 0;
-}
-
-
-.burger {
-  display: none;
-  position: fixed;
-  top: 32px;
-  left: 14px;
-  z-index: 200;
-  background: #1e2a2a;
-  border: 1px solid #2e4040;
-  border-radius: 8px;
-  padding: 8px 10px;
-  cursor: pointer;
-  flex-direction: column;
-  gap: 5px;
-  width: 40px;
-  height: 40px;
+.masthead-row {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-  transition: background 0.2s, left 0.3s ease;
+  gap: 18px;
+  max-width: 940px;
+  margin: 0 auto;
 }
-.burger:hover { background: #263838; }
-.burger span {
+.stamp {
+  flex-shrink: 0;
+  font-family: 'Courier Prime', monospace;
+  font-weight: 700;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid var(--ink);
+  padding: 5px 9px;
+  color: var(--ink);
+}
+.chapters {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  padding-bottom: 14px;
+  flex: 1;
+  scrollbar-width: thin;
+}
+.chapters a {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.02em;
+  padding: 6px 10px;
+  border: 1px solid var(--rule);
+  color: var(--ink-soft);
+  white-space: nowrap;
+  text-decoration: none;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chapters a:hover { border-color: var(--ink); color: var(--ink); }
+.chapters a.active {
+  border-color: var(--red);
+  color: var(--red);
+  background: var(--red-soft);
+}
+
+.page-inner {
+  max-width: 940px;
+  margin: 0 auto;
+  padding: 0 calc(20px + env(safe-area-inset-right)) 0 calc(20px + env(safe-area-inset-left));
+}
+.prose-wrap {
+  max-width: 680px;
+  padding: 48px 0 90px;
+}
+
+.title-block {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+.ghost-num {
+  font-family: 'Courier Prime', monospace;
+  font-weight: 700;
+  font-size: 4.6rem;
+  line-height: 0.8;
+  color: var(--ink);
+  opacity: 0.09;
+  flex-shrink: 0;
+}
+.kicker {
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--red);
+  margin: 0 0 8px;
+}
+h1 {
+  font-family: 'Courier Prime', monospace;
+  font-weight: 700;
+  font-size: 1.5rem;
+  line-height: 1.3;
+  margin: 0;
+}
+h1 code { font-size: 0.9em; background: none; border: none; padding: 0; }
+hr.rule {
+  border: none;
+  border-top: 1px solid var(--rule);
+  margin: 32px 0 34px;
+}
+
+h2 {
+  font-family: 'Courier Prime', monospace;
+  font-weight: 700;
+  font-size: 1.02rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin: 2.6rem 0 1rem;
+}
+
+h3 {
+  font-family: 'Newsreader', serif;
+  font-weight: 600;
+  font-style: italic;
+  font-size: 1.15rem;
+  margin: 1.6rem 0 0.6rem;
+}
+
+p { margin: 0 0 1.05rem; }
+
+.prose > p:first-of-type::first-letter {
+  font-family: 'Courier Prime', monospace;
+  font-weight: 700;
+  font-size: 2.9rem;
+  float: left;
+  line-height: 0.8;
+  margin: 6px 6px 0 0;
+  color: var(--red);
+}
+
+ul { margin: 0 0 1.1rem; padding-left: 1.25rem; }
+li { margin-bottom: 0.4rem; }
+
+code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85em;
+  background: var(--paper-inset);
+  border: 1px solid var(--rule);
+  padding: 1px 5px;
+  color: var(--ink);
+  border-radius: var(--radius);
+}
+
+pre {
+  background: var(--paper-inset);
+  border: 1px solid var(--ink);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  overflow-x: auto;
+  margin: 0 0 1.3rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.84rem;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: pre-wrap;
+}
+pre code { background: none; border: none; padding: 0; }
+
+.label {
   display: block;
-  width: 20px;
-  height: 2px;
-  background: #80cbc4;
-  border-radius: 2px;
-  transition: transform 0.3s, opacity 0.3s;
-  transform-origin: center;
+  font-family: 'Newsreader', serif;
+  font-style: italic;
+  color: var(--ink-soft);
+  margin: 0 0 0.6rem;
 }
 
-.burger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
-.burger.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
-.burger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
-
-
-.sidebar {
-  transition: transform 0.3s ease, width 0.3s ease;
+aside.margin-note {
+  font-family: 'Newsreader', serif;
+  font-style: italic;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--ink);
+  border-left: 3px solid var(--red);
+  background: var(--red-soft);
+  padding: 10px 14px;
+  margin: 0 0 1.3rem;
+}
+aside.margin-note .note-label {
+  display: block;
+  font-family: 'Courier Prime', monospace;
+  font-style: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-size: 0.66rem;
+  color: var(--red);
+  font-weight: 700;
+  margin-bottom: 4px;
 }
 
-
-.sidebar-scrim {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.55);
-  z-index: 98;
-  opacity: 0;
-  transition: opacity 0.3s;
+.turn-page {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 3.5rem;
+  padding-top: 1.6rem;
+  border-top: 1px solid var(--rule);
 }
-.sidebar-scrim.visible {
-  opacity: 1;
+.turn-page a {
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.72rem;
+  text-decoration: none;
+  border: 1px solid var(--ink);
+  padding: 10px 14px;
+  color: var(--ink);
+  flex: 1;
+  max-width: 48%;
 }
+.turn-page a:hover { border-color: var(--red); color: var(--red); }
+.turn-page a.next { text-align: right; margin-left: auto; }
+.turn-page .placeholder { visibility: hidden; flex: 1; max-width: 48%; }
 
-
-@media (max-width: 700px) {
-  .burger { display: flex; }
-
-  .content { padding-top: 64px; }
-
-  .sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    height: 100vh;
-    z-index: 100;
-    transform: translateX(-100%);
-    box-shadow: 4px 0 24px rgba(0,0,0,0.5);
-  }
-  .sidebar.open {
-    transform: translateX(0);
-  }
-  .sidebar-scrim {
-    display: block;
-  }
-}
-
-@media (min-width: 701px) {
-  .burger { display: flex; }
-
-  .layout {
-    position: relative;
-  }
-  .sidebar {
-    overflow: hidden;
-  }
-  .sidebar.collapsed {
-    width: 0 !important;
-    padding: 0 !important;
-    border: none !important;
-  }
-  .content {
-    padding-top: 16px;
-    transition: margin-left 0.3s;
-  }
-
-  .layout:not(.sidebar-collapsed) .content {
-    padding-left: 16px;
+@media (min-width: 1100px) {
+  .page-inner { display: flex; justify-content: center; }
+  .prose-wrap { position: relative; }
+  aside.margin-note {
+    float: right;
+    clear: right;
+    width: 190px;
+    margin: 2px -228px 1rem 0;
+    border-left: none;
+    border: 1px solid var(--red);
   }
 }
 
+@media (max-width: 560px) {
+  .ghost-num { font-size: 3.2rem; }
+  h1 { font-size: 1.2rem; }
+  .stamp { display: none; }
+}
 </style>
 </head>
-<body>
-<button class="burger" id="burgerBtn" aria-label="Toggle navigation">
-  <span></span><span></span><span></span>
-</button>
-<div class="sidebar-scrim" id="sidebarScrim"></div>
+<body class="">
 
-<div class="layout">
-<nav class="sidebar">
-<h2>Tutorial Pages</h2>
+<header class="masthead">
+  <div class="masthead-row">
+    <span class="stamp">CS &middot; No. 06</span>
+    <nav class="chapters">
 <a href="index.html">Part 1: What Is ChoiceScript?</a>
 <a href="part2.html">Part 2: The Basics & Indentation</a>
 <a href="part3.html">Part 3: Which choices to use and when</a>
@@ -187,23 +282,31 @@ body {
 <a href="part6.html" class="active">Part 6: Scenes & *scene_list</a>
 <a href="part7.html">Part 7: Temporary Variables & *rand</a>
 <a href="part8.html">Part 8: Common Errors & Debugging</a>
-</nav>
+    </nav>
+  </div>
+</header>
+
+<div class="page-inner">
+  <div class="prose-wrap">
+    <div class="title-block">
+      <span class="ghost-num">06</span>
+      <div>
+        <p class="kicker">Chapter 06 of 08</p>
+        <h1>Part 6: Scenes &amp; <code>*scene_list</code></h1>
+      </div>
+    </div>
+    <hr class="rule">
+    <div class="prose">
 <main class="content">
-<h1>Part 6: Scenes &amp; <code>*scene_list</code></h1>
 
 <p>As your story grows, you'll need to split it up into multiple scene files.</p>
-
 <p>Examples:</p>
-
-<p><code>startup.txt</code> – create the variables & where the game begins.</p>
+<p><code>startup.txt</code> – create the variables &amp; where the game begins.</p>
 <p><code>chapter1.txt</code></p>
 <p><code>chapter2.txt</code></p>
 <p><code>ending.txt</code></p>
-
 <h2><code>*scene_list</code></h2>
-
 <p>In <code>startup.txt</code>, you tell ChoiceScript which scenes exist and in what order:</p>
-
 <pre>
 *title (Your story's name)
 *author (Your name)
@@ -218,109 +321,32 @@ body {
 Welcome to the game!
 *finish
 </pre>
-
 <p>Each line after <code>*scene_list</code> is the name of a <code>.txt</code> file (without the <code>.txt</code>).</p>
-<p>ChoiceScript will look for files like <code>chapter1.txt</code> in your scenes folder. It's case sensitive, so make sure its spelt correctly.</p>
-
+<aside class="margin-note"><span class="note-label">Note</span>ChoiceScript will look for files like <code>chapter1.txt</code> in your scenes folder. It's case sensitive, so make sure its spelt correctly.</aside>
 <h2>Moving to the next scene: <code>*finish</code></h2>
-
 <p>At the end of a scene, you can use <code>*finish</code> to jump to the next file in <code>*scene_list</code>:</p>
-
 <pre>
 You scream as you take an arrow to the knee and pass out.
 
 *finish
 </pre>
-
 <p>If you are in <code>startup.txt</code>, <code>*finish</code> will move to <code>chapter1.txt</code>. Its best to have them listed in order.</p>
-
 <h2>Jumping directly to another scene: <code>*goto_scene</code></h2>
-
 <p>If you want to skip to a specific scene, use <code>*goto_scene</code>:</p>
-
 <pre>
 *goto_scene ending
 </pre>
-
 <p>This jumps straight to <code>ending.txt</code>, ignoring the <code>*scene_list</code> order.</p>
-
 <h2>When to make a new scene file</h2>
-
 <p>Some reasons to create a new scene file:</p>
-
 <p>A new chapter.</p>
 <p>A death/endgame scene</p>
 <p>To keep individual files smaller and easier to manage.</p>
 </main>
+    </div>
+    <nav class="turn-page"><a class="prev" href="part5.html">&larr; Part 5: The Stats Screen</a><a class="next" href="part7.html">Part 7: Temporary Variables & *rand &rarr;</a></nav>
+  </div>
 </div>
-
-<script>
-(function() {
-  var btn    = document.getElementById('burgerBtn');
-  var sidebar = document.querySelector('.sidebar');
-  var scrim  = document.getElementById('sidebarScrim');
-  var isMobile = function() { return window.innerWidth <= 700; };
-
-  var SIDEBAR_WIDTH = 260; // must match .sidebar width in CSS
-  var BURGER_MARGIN = 14;  // left offset when sidebar is closed
-
-  function moveBurger(open) {
-    btn.style.left = open ? (SIDEBAR_WIDTH + BURGER_MARGIN) + 'px' : BURGER_MARGIN + 'px';
-  }
-
-  function openSidebar() {
-    sidebar.classList.add('open');
-    btn.classList.add('open');
-    moveBurger(true);
-    if (isMobile()) {
-      scrim.classList.add('visible');
-      document.body.style.overflow = 'hidden';
-    }
-  }
-  function closeSidebar() {
-    sidebar.classList.remove('open');
-    btn.classList.remove('open');
-    moveBurger(false);
-    scrim.classList.remove('visible');
-    document.body.style.overflow = '';
-    if (!isMobile()) {
-      sidebar.classList.add('collapsed');
-    }
-  }
-  function toggleSidebar() {
-    if (isMobile()) {
-      sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
-    } else {
-      if (sidebar.classList.contains('collapsed')) {
-        sidebar.classList.remove('collapsed');
-        btn.classList.add('open');
-        moveBurger(true);
-      } else {
-        sidebar.classList.add('collapsed');
-        btn.classList.remove('open');
-        moveBurger(false);
-      }
-    }
-  }
-
-  btn.addEventListener('click', toggleSidebar);
-  scrim.addEventListener('click', closeSidebar);
-
-  // Close on nav link click on mobile
-  sidebar.querySelectorAll('a').forEach(function(a) {
-    a.addEventListener('click', function() {
-      if (isMobile()) closeSidebar();
-    });
-  });
-
-  window.addEventListener('resize', function() {
-    if (!isMobile()) {
-      scrim.classList.remove('visible');
-      document.body.style.overflow = '';
-    }
-  });
-})();
-</script>
 
 </body>
 </html>
