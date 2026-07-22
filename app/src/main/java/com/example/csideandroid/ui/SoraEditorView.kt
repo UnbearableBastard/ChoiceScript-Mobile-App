@@ -24,6 +24,7 @@ import androidx.annotation.StyleRes
 import androidx.webkit.WebViewAssetLoader
 import io.github.rosemoe.sora.event.ContentChangeEvent
 import io.github.rosemoe.sora.event.ScrollEvent
+import io.github.rosemoe.sora.event.SelectionChangeEvent
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.widget.EditorSearcher
 import io.github.rosemoe.sora.widget.schemes.EditorColorScheme
@@ -51,6 +52,7 @@ class SoraEditorView @JvmOverloads constructor(
 
     private var commandsList: List<String> = emptyList()
     private var isApplyingAutoIndent: Boolean = false
+    private var lastKnownCursorLine: Int = -1
     private var activeSearchQuery: String? = null
     private val activeSearchOptions = EditorSearcher.SearchOptions(false, false)
 
@@ -526,6 +528,8 @@ class SoraEditorView @JvmOverloads constructor(
         editor.isHighlightCurrentLine = true
         editor.isWordwrap = true
         editor.props.symbolPairAutoCompletion = true
+        // Fix: keep the whole file addressable by the IME. Past ~32,768 chars limit
+        editor.props.maxIPCTextLength = 5_000_000
         editor.setEditorLanguage(language)
 
         editor.inputType = android.text.InputType.TYPE_CLASS_TEXT or
@@ -565,6 +569,17 @@ class SoraEditorView @JvmOverloads constructor(
                                 changedText.startsWith("\n") || changedText.startsWith("\r\n"))
                 if (looksLikeSingleNewlineInsert) editor.post { autoIndentOnNewline() }
             }
+        }
+
+        // When the cursor jumps to a different line,force the keyboard to drop its composing span from the old position and start fresh.
+        editor.subscribeAlways(SelectionChangeEvent::class.java) {
+            val newLine = editor.cursor.leftLine
+            if (lastKnownCursorLine != -1 && newLine != lastKnownCursorLine) {
+                val imm = context.getSystemService(android.content.Context.INPUT_METHOD_SERVICE)
+                        as? android.view.inputmethod.InputMethodManager
+                imm?.restartInput(editor)
+            }
+            lastKnownCursorLine = newLine
         }
     }
 

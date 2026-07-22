@@ -14,8 +14,8 @@ android {
         minSdk = 26
         targetSdk = 36
 
-        versionCode = 8
-        versionName = "2.7.1"
+        versionCode = 10
+        versionName = "2.9"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -50,9 +50,10 @@ android {
 dependencies {
     implementation("io.github.rosemoe:editor:0.24.5")
     implementation("androidx.documentfile:documentfile:1.1.0")
+    implementation("androidx.core:core-splashscreen:1.2.0")
     testImplementation("junit:junit:4.13.2")
     implementation("org.nanohttpd:nanohttpd:2.3.1")
-    implementation("androidx.webkit:webkit:1.15.0")
+    implementation("androidx.webkit:webkit:1.16.0")
     implementation(libs.androidx.core.ktx)
     implementation("androidx.core:core-ktx:1.18.0")
     implementation(libs.androidx.appcompat)
