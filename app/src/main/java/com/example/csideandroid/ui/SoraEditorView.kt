@@ -88,6 +88,10 @@ class SoraEditorView @JvmOverloads constructor(
     }
 
 
+    // Indentation: false = 4 spaces while true = a single tab.
+    private var useTabsForIndent: Boolean = false
+    private val indentUnit: String get() = if (useTabsForIndent) "\t" else "    "
+
     // Visible Indents
     private var visibleIndentsEnabled: Boolean = false
     private val indentPaint: Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -673,13 +677,18 @@ class SoraEditorView @JvmOverloads constructor(
 
     fun setCommands(commands: List<String>) {
         commandsList = commands
-        language = ChoiceScriptLanguage(commands)
+        language = ChoiceScriptLanguage(commands, useTabsForIndent = useTabsForIndent)
         editor.setEditorLanguage(language)
         editor.post { updateCommandPopup() }
     }
 
     fun setAutoCloseBrackets(enabled: Boolean) {
         editor.props.symbolPairAutoCompletion = enabled
+    }
+
+    fun setUseTabs(enabled: Boolean) {
+        useTabsForIndent = enabled
+        language.setUseTabs(enabled)
     }
 
     fun setTheme(themeName: String) {
@@ -749,7 +758,7 @@ class SoraEditorView @JvmOverloads constructor(
         var startLine = minOf(leftLine, rightLine); var endLine = maxOf(leftLine, rightLine)
         if (hasSelection) { val sel = (rightCol == 0 && rightLine > leftLine) || (leftCol == 0 && leftLine > rightLine); if (sel) endLine -= 1 }
         if (endLine < startLine) { startLine = minOf(leftLine, rightLine); endLine = startLine }
-        runCatching { editor.text.beginBatchEdit(); for (ln in startLine..endLine) editor.text.insert(ln, 0, "    ") }.also { editor.text.endBatchEdit() }
+        runCatching { editor.text.beginBatchEdit(); for (ln in startLine..endLine) editor.text.insert(ln, 0, indentUnit) }.also { editor.text.endBatchEdit() }
     }
 
     fun outdent() {
@@ -766,7 +775,11 @@ class SoraEditorView @JvmOverloads constructor(
             for (ln in startLine..endLine) {
                 val lineText = editor.text.getLine(ln).toString()
                 var toRemove = 0
-                while (toRemove < 4 && toRemove < lineText.length && lineText[toRemove] == ' ') toRemove++
+                if (lineText.isNotEmpty() && lineText[0] == '\t') {
+                    toRemove = 1 // one tab = one level
+                } else {
+                    while (toRemove < 4 && toRemove < lineText.length && lineText[toRemove] == ' ') toRemove++
+                }
                 if (toRemove > 0) editor.text.delete(ln, 0, ln, toRemove)
             }
         }.also { editor.text.endBatchEdit() }
@@ -868,6 +881,8 @@ class SoraEditorView @JvmOverloads constructor(
 
     private fun countLeadingSpaces(s: String): Int { var i = 0; while (i < s.length && s[i] == ' ') i++; return i }
 
+    private fun countLeadingTabs(s: String): Int { var i = 0; while (i < s.length && s[i] == '\t') i++; return i }
+
     private fun isBlockOpener(trimmedLine: String): Boolean {
         if (trimmedLine.startsWith("#")) return true
         // opposed_pair inside stat_chart also triggers indent for sub-label
@@ -894,9 +909,28 @@ class SoraEditorView @JvmOverloads constructor(
         if (line <= 0) return
         val prevLineText = editor.text.getLine(line - 1).toString()
         val prevTrimmed = prevLineText.trimStart()
+        val currentLineText = editor.text.getLine(line).toString()
+
+        if (useTabsForIndent) {
+            // Tabs mode: one tab per indent level.
+            val targetLevels = if (isReturn(prevTrimmed)) 0
+            else countLeadingTabs(prevLineText) + if (isBlockOpener(prevTrimmed)) 1 else 0
+            val currentTabs = countLeadingTabs(currentLineText)
+            if (currentTabs == targetLevels && currentLineText.substring(currentTabs).isEmpty()) return
+            isApplyingAutoIndent = true
+            try {
+                editor.text.beginBatchEdit()
+                editor.text.delete(line, 0, line, currentTabs)
+                if (targetLevels > 0) editor.text.insert(line, 0, "\t".repeat(targetLevels))
+                editor.setSelection(line, targetLevels)
+                editor.text.endBatchEdit()
+            } finally { isApplyingAutoIndent = false }
+            return
+        }
+
+        // Spaces mode: original behavior, unchanged.
         val targetIndent = if (isReturn(prevTrimmed)) 0
         else countLeadingSpaces(prevLineText) + if (isBlockOpener(prevTrimmed)) 4 else 0
-        val currentLineText = editor.text.getLine(line).toString()
         val currentIndent = countLeadingSpaces(currentLineText)
         if (currentIndent == targetIndent && currentLineText.substring(currentIndent).isEmpty()) return
         isApplyingAutoIndent = true
@@ -907,7 +941,6 @@ class SoraEditorView @JvmOverloads constructor(
             editor.setSelection(line, targetIndent)
             editor.text.endBatchEdit()
         } finally { isApplyingAutoIndent = false }
-
     }
 
     private fun applySelectedCommand(selectedWithStar: String) {

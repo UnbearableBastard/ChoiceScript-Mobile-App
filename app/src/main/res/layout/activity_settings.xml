@@ -262,6 +262,55 @@
 
                 </LinearLayout>
 
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/pb_border" />
+
+                <!-- Use Tabs for Indentation -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="8dp">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Use Tabs for Indentation"
+                            android:textSize="16sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/pb_text_primary" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Indent with tabs instead of spaces. ChoiceScript needs one or the other throughout a project - set this to match your project before you start editing."
+                            android:textSize="13sp"
+                            android:textColor="@color/pb_text_secondary"
+                            android:layout_marginTop="2dp" />
+
+                    </LinearLayout>
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/switchUseTabs"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="16dp"
+                        app:thumbTint="@color/pb_switch_thumb"
+                        app:trackTint="@color/pb_switch_track"
+                        android:checked="false" />
+
+                </LinearLayout>
+
             </LinearLayout>
 
         </com.google.android.material.card.MaterialCardView>

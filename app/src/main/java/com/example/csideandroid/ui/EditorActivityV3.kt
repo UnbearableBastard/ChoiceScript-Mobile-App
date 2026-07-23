@@ -136,6 +136,9 @@ class EditorActivityV3 : AppCompatActivity() {
         // Apply auto-close brackets/quotes setting
         editor.setAutoCloseBrackets(prefs.getBoolean(SettingsActivity.KEY_AUTO_CLOSE_BRACKETS, true))
 
+        // Apply indentation-unit setting
+        editor.setUseTabs(prefs.getBoolean(SettingsActivity.KEY_USE_TABS, false))
+
         // Bottom bar IDs
         btnUndo = findViewById(R.id.btnUndo)
         btnRedo = findViewById(R.id.btnRedo)

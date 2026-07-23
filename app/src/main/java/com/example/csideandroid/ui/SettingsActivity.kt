@@ -17,6 +17,7 @@ class SettingsActivity : AppCompatActivity() {
         const val KEY_SPELL_CHECK = "spell_check_enabled"
         const val KEY_RESET_ON_LAUNCH = "runner_reset_on_launch"
         const val KEY_AUTO_CLOSE_BRACKETS = "auto_close_brackets"
+        const val KEY_USE_TABS = "use_tabs_indent"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,6 +58,12 @@ class SettingsActivity : AppCompatActivity() {
         switchAutoCloseBrackets.isChecked = prefs.getBoolean(KEY_AUTO_CLOSE_BRACKETS, true)
         switchAutoCloseBrackets.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit { putBoolean(KEY_AUTO_CLOSE_BRACKETS, isChecked) }
+        }
+
+        val switchUseTabs = findViewById<SwitchMaterial>(R.id.switchUseTabs)
+        switchUseTabs.isChecked = prefs.getBoolean(KEY_USE_TABS, false)
+        switchUseTabs.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit { putBoolean(KEY_USE_TABS, isChecked) }
         }
     }
 }

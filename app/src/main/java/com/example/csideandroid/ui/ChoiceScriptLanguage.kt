@@ -10,7 +10,8 @@ import io.github.rosemoe.sora.widget.schemes.EditorColorScheme
 
 class ChoiceScriptLanguage(
     private var commands: List<String>,
-    private var themeColors: EditorThemeColors? = null
+    private var themeColors: EditorThemeColors? = null,
+    private var useTabsForIndent: Boolean = false
 ) : EmptyLanguage() {
 
     private val customColorBaseId: Int = 512
@@ -116,6 +117,12 @@ class ChoiceScriptLanguage(
         pairs.putPair('[', SymbolPairMatch.SymbolPair("[", "]"))
         pairs.putPair('{', SymbolPairMatch.SymbolPair("{", "}"))
         return pairs
+    }
+
+    override fun useTab(): Boolean = useTabsForIndent
+
+    fun setUseTabs(enabled: Boolean) {
+        useTabsForIndent = enabled
     }
 
     fun setCommands(newCommands: List<String>) {
