@@ -16,20 +16,6 @@
         android:gravity="center_vertical"
         android:padding="20dp">
 
-        <FrameLayout
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:background="@drawable/bg_section_header_icon">
-
-            <ImageView
-                android:layout_width="18dp"
-                android:layout_height="18dp"
-                android:layout_gravity="center"
-                android:src="@drawable/ic_refresh_24"
-                app:tint="@color/pb_accent"
-                android:contentDescription="@null" />
-        </FrameLayout>
-
         <TextView
             android:id="@+id/txtWhatsNewTitle"
             android:layout_width="0dp"

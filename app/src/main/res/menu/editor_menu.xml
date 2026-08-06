@@ -5,7 +5,6 @@
         android:id="@+id/action_theme"
         android:title="Theme"
         android:icon="@drawable/ic_menu_24"
-        app:showAsAction="always"
-        app:iconTint="@android:color/white" />
+        app:showAsAction="always" />
 
 </menu>

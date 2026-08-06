@@ -16,6 +16,7 @@ import java.io.File
 
 private const val VIEW_TYPE_HEADER = 0
 private const val VIEW_TYPE_FILE = 1
+private const val PAYLOAD_ROW_SHAPE = "row_shape"
 
 class ProjectListAdapter(
     private var groups: List<ProjectGroup>,
@@ -74,6 +75,25 @@ class ProjectListAdapter(
     override fun getItemCount(): Int = rows.size
 
     fun rowAt(position: Int): RowItem? = rows.getOrNull(position)
+
+    // Group owning the file row at position, or null if that row isn't a file row.
+    fun fileGroupAt(position: Int): ProjectGroup? =
+        (rows.getOrNull(position) as? RowItem.FileRow)?.group
+
+    fun refreshRowShapes(group: ProjectGroup) {
+        val first = rows.indexOfFirst { it is RowItem.FileRow && it.group === group }
+        if (first == -1) return
+
+        var count = 0
+        var i = first
+        while (i < rows.size) {
+            val r = rows[i]
+            if (r !is RowItem.FileRow || r.group !== group) break
+            count++
+            i++
+        }
+        if (count > 0) notifyItemRangeChanged(first, count, PAYLOAD_ROW_SHAPE)
+    }
 
     // Returns true if a drag from `from` to `to` is a legal move.
     fun canMove(from: Int, to: Int): Boolean {

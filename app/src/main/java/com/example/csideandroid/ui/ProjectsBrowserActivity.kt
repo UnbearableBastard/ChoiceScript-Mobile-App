@@ -69,6 +69,8 @@ class ProjectsBrowserActivity : AppCompatActivity() {
         private var didBootUpdateCheck: Boolean = false
         // Same, but for the "what's new" popup shown once after an update is installed.
         private var didBootWhatsNewCheck: Boolean = false
+        // Set once the popup has actually been displayed in this process.
+        private var didShowWhatsNew: Boolean = false
         private const val KEY_LAST_SEEN_VERSION = "last_seen_app_version"
 
         // Survives Activity recreation (rotation, theme toggle, etc.) so recreation never
@@ -84,6 +86,9 @@ class ProjectsBrowserActivity : AppCompatActivity() {
 
     private var helpDialog: AlertDialog? = null
     private val PREF_HIDE_HELP_POPUP = "hide_help_popup"
+
+    // Release notes fetched but not yet displayed (queued behind the help popup on first run).
+    private var pendingWhatsNew: Pair<String, String>? = null
 
     private val pickBase =
         registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
@@ -429,6 +434,7 @@ class ProjectsBrowserActivity : AppCompatActivity() {
         val sideMenuContent = findViewById<View>(R.id.sideMenuContent)
         val projectsContent = findViewById<View>(R.id.projectsContent)
         val sideMenuBasePaddingTop = sideMenuContent.paddingTop
+        val sideMenuBasePaddingBottom = sideMenuContent.paddingBottom
         val projectsContentBasePaddingTop = projectsContent.paddingTop
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(findViewById<View>(R.id.rootProjectsBrowser)) { _, insets ->
             val topInset = insets.getInsets(
@@ -436,12 +442,16 @@ class ProjectsBrowserActivity : AppCompatActivity() {
                         or androidx.core.view.WindowInsetsCompat.Type.displayCutout()
             ).top
 
+            val navBottomInset = insets.getInsets(
+                androidx.core.view.WindowInsetsCompat.Type.navigationBars()
+            ).bottom
+
             topFillBar.layoutParams = topFillBar.layoutParams.apply { height = topInset }
             topFillBar.requestLayout()
 
             sideMenuContent.setPadding(
                 sideMenuContent.paddingLeft, sideMenuBasePaddingTop + topInset,
-                sideMenuContent.paddingRight, sideMenuContent.paddingBottom
+                sideMenuContent.paddingRight, sideMenuBasePaddingBottom + navBottomInset
             )
             projectsContent.setPadding(
                 projectsContent.paddingLeft, projectsContentBasePaddingTop + topInset,
@@ -593,8 +603,10 @@ class ProjectsBrowserActivity : AppCompatActivity() {
             didBootWhatsNewCheck = true
             checkWhatsNew()
         }
-    }
 
+        // Notes may have arrived while the activity was paused.
+        flushPendingWhatsNew()
+    }
 
 
     override fun onDestroy() {
@@ -609,15 +621,13 @@ class ProjectsBrowserActivity : AppCompatActivity() {
     private fun checkWhatsNew() {
         val current = getCurrentVersionName()
         if (current.isBlank()) return
+        if (didShowWhatsNew) return
 
         val lastSeen = prefs.getString(KEY_LAST_SEEN_VERSION, null)
 
-        if (lastSeen == null) {
-            // Fresh install
-            prefs.edit { putString(KEY_LAST_SEEN_VERSION, current) }
-            return
-        }
-        if (lastSeen == current) return // same version as last launch
+        // lastSeen == null is a fresh install, which should see the notes once.
+        // Only an exact match means this version's notes have already been shown.
+        if (lastSeen == current) return
 
         updateExecutor.execute {
             val apiUrl = "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
@@ -633,25 +643,55 @@ class ProjectsBrowserActivity : AppCompatActivity() {
                 val code = conn.responseCode
                 val stream = if (code in 200..299) conn.inputStream else conn.errorStream
                 val respBody = BufferedReader(InputStreamReader(stream)).use { it.readText() }
-                if (code !in 200..299) {
-                    prefs.edit { putString(KEY_LAST_SEEN_VERSION, current) }
-                    return@execute
-                }
+
+                // Network/API failure: leave the stored version alone so the next
+                // launch retries instead of silently burning the notes.
+                if (code !in 200..299) return@execute
 
                 val json = JSONObject(respBody)
                 val tag = json.optString("tag_name", current).trim()
                 val notes = markdownToPlain(json.optString("body", "").trim())
 
-                prefs.edit { putString(KEY_LAST_SEEN_VERSION, current) }
-
-                if (notes.isBlank()) return@execute
+                // Nothing worth showing — mark seen so we stop asking for this version.
+                if (notes.isBlank()) {
+                    prefs.edit { putString(KEY_LAST_SEEN_VERSION, current) }
+                    return@execute
+                }
 
                 runOnUiThread {
-                    if (!isDestroyed) showWhatsNewPopup(tag, notes)
+                    if (isDestroyed || isFinishing) return@runOnUiThread
+                    pendingWhatsNew = tag to notes
+                    flushPendingWhatsNew()
                 }
             } catch (_: Throwable) {
             }
         }
+    }
+
+
+    private fun flushPendingWhatsNew() {
+        if (didShowWhatsNew) {
+            pendingWhatsNew = null
+            return
+        }
+        val pending = pendingWhatsNew ?: return
+        if (isDestroyed || isFinishing) return
+
+        // Help popup is on screen. Wait for its dismiss listener to call us back.
+        if (helpDialog?.isShowing == true) return
+
+        // Help popup is due but hasn't been created yet (fresh install, onResume
+        // not reached). Wait rather than stacking on top of it.
+        if (helpDialog == null && !prefs.getBoolean(PREF_HIDE_HELP_POPUP, false)) return
+
+        pendingWhatsNew = null
+        didShowWhatsNew = true
+
+        val current = getCurrentVersionName()
+        if (current.isNotBlank()) {
+            prefs.edit { putString(KEY_LAST_SEEN_VERSION, current) }
+        }
+        showWhatsNewPopup(pending.first, pending.second)
     }
 
     private fun markdownToPlain(text: String): String {
@@ -689,7 +729,6 @@ class ProjectsBrowserActivity : AppCompatActivity() {
     }
 
     private fun checkForUpdates(userInitiated: Boolean = true) {
-        // Requires INTERNET permission in AndroidManifest.xml
         if (userInitiated) {
             Toast.makeText(this, "Checking for updates…", Toast.LENGTH_SHORT).show()
         }
@@ -952,6 +991,7 @@ class ProjectsBrowserActivity : AppCompatActivity() {
             .setView(view)
             .setOnDismissListener {
                 prefs.edit { putBoolean(PREF_HIDE_HELP_POPUP, cb.isChecked) }
+                flushPendingWhatsNew()
             }
             .create()
 
@@ -2042,14 +2082,11 @@ class ProjectsBrowserActivity : AppCompatActivity() {
         emptyView.visibility = if (rawAll.isEmpty()) View.VISIBLE else View.GONE
     }
 
-    // DRAG & DROP (project headers reorder among themselves; files reorder within their own project)
-
     private fun attachDragDrop(recycler: RecyclerView, adapter: ProjectListAdapter): ItemTouchHelper {
         val callback = object : ItemTouchHelper.SimpleCallback(
             ItemTouchHelper.UP or ItemTouchHelper.DOWN, 0
         ) {
             override fun isLongPressDragEnabled() = true
-
             override fun onMove(rv: RecyclerView, vh: RecyclerView.ViewHolder, target: RecyclerView.ViewHolder): Boolean {
                 val from = vh.bindingAdapterPosition
                 val to = target.bindingAdapterPosition
@@ -2060,6 +2097,12 @@ class ProjectsBrowserActivity : AppCompatActivity() {
             }
 
             override fun onSwiped(vh: RecyclerView.ViewHolder, dir: Int) {}
+            override fun clearView(rv: RecyclerView, vh: RecyclerView.ViewHolder) {
+                super.clearView(rv, vh)
+                val pos = vh.bindingAdapterPosition
+                if (pos == RecyclerView.NO_POSITION) return
+                adapter.fileGroupAt(pos)?.let { adapter.refreshRowShapes(it) }
+            }
         }
         val helper = ItemTouchHelper(callback)
         helper.attachToRecyclerView(recycler)
@@ -2176,7 +2219,7 @@ class ProjectsBrowserActivity : AppCompatActivity() {
     private fun countTxtFilesRecursive(dir: DocumentFile): Int {
         if (!dir.exists()) return 0
         var count = 0
-        val children = dir.listFiles() ?: return 0
+        val children = dir.listFiles()
         for (f in children) {
             if (f.isDirectory) {
                 count += countTxtFilesRecursive(f)

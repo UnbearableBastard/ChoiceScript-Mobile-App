@@ -10,6 +10,7 @@ import android.view.inputmethod.EditorInfo
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -22,6 +23,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.documentfile.provider.DocumentFile
 import com.example.csideandroid.R
+import com.example.csideandroid.runner.RunnerActivity
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.card.MaterialCardView
 import kotlinx.coroutines.Dispatchers
@@ -29,6 +31,8 @@ import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.io.OutputStreamWriter
+import java.io.File
+import java.io.FileOutputStream
 import kotlin.math.max
 import android.annotation.SuppressLint
 import android.content.Intent
@@ -41,6 +45,7 @@ import androidx.webkit.WebViewAssetLoader
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.InputStream
+import androidx.core.content.edit
 
 class EditorActivityV3 : AppCompatActivity() {
 
@@ -54,6 +59,7 @@ class EditorActivityV3 : AppCompatActivity() {
     private lateinit var btnIndent: ImageButton
     private lateinit var btnOutdent: ImageButton
     private lateinit var btnSearch: ImageButton
+    private lateinit var btnPlay: ImageButton
     private lateinit var btnSave: ImageButton
     private lateinit var btnFormat: ImageButton
     private lateinit var btnZoomOut: ImageButton
@@ -66,6 +72,15 @@ class EditorActivityV3 : AppCompatActivity() {
     private var btnSearchNext: ImageButton? = null
     private var btnSearchClose: ImageButton? = null
     private var currentSearchQuery: String = ""
+
+    // Scene side menu (left-slide list of .txt scenes)
+    private var scenePanel: MaterialCardView? = null
+    private var sceneScrim: View? = null
+    private var sceneListContainer: LinearLayout? = null
+    private var sceneEdgeIndicator: MaterialCardView? = null
+    private var isScenePanelOpen: Boolean = false
+    private var scenePanelBackCallback: androidx.activity.OnBackPressedCallback? = null
+    private val scenePanelWidthPx: Int by lazy { (240 * resources.displayMetrics.density).toInt() }
 
 
     private data class QuicktestError(
@@ -144,8 +159,15 @@ class EditorActivityV3 : AppCompatActivity() {
         btnRedo = findViewById(R.id.btnRedo)
         btnIndent = findViewById(R.id.btnIndent)
         btnOutdent = findViewById(R.id.btnOutdent)
-        btnSearch = findViewById(R.id.btnSearch)
+        btnSearch = findViewById(R.id.btnSearchTop)
+        btnPlay = findViewById(R.id.btnPlayTop)
         btnSave = findViewById(R.id.btnSave)
+
+        // Scene side menu views
+        scenePanel = findViewById(R.id.scenePanel)
+        sceneScrim = findViewById(R.id.sceneScrim)
+        sceneListContainer = findViewById(R.id.sceneListContainer)
+        sceneEdgeIndicator = findViewById(R.id.sceneEdgeIndicator)
         btnFormat = findViewById(R.id.btnFormat)
         btnZoomOut = findViewById(R.id.btnZoomOut)
         btnZoomIn = findViewById(R.id.btnZoomIn)
@@ -170,7 +192,23 @@ class EditorActivityV3 : AppCompatActivity() {
         btnIndent.setOnClickListener { editor.outdent() }
         btnOutdent.setOnClickListener { editor.indent() }
         btnSearch.setOnClickListener { onSearchButtonPressed() }
+        btnPlay.setOnClickListener { playCurrentProject() }
         btnSave.setOnClickListener { saveDocument(showToast = true) }
+
+        // Scene side menu: start closed, wire toggles.
+        setScenePanelWidthPx(0)
+        findViewById<View>(R.id.sceneEdgeGrabber)?.setOnClickListener { toggleScenePanel() }
+        sceneEdgeIndicator?.setOnClickListener { toggleScenePanel() }
+        sceneScrim?.setOnClickListener { setScenePanelOpen(false) }
+
+        onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                if (isScenePanelOpen) setScenePanelOpen(false)
+            }
+        }.also { cb ->
+            // Keep the callback enabled only while the panel is open.
+            scenePanelBackCallback = cb
+        })
 
         // Error Checker button: Quicktest
         btnFormat.setOnClickListener {
@@ -219,6 +257,8 @@ class EditorActivityV3 : AppCompatActivity() {
             loadDocumentIntoEditor()
         }
 
+        refreshSceneFileCache()
+
         toolbar.title = displayName ?: ""
         currentDisplayName = displayName
         toolbar.setTitleTextColor(currentUiTint)
@@ -237,9 +277,16 @@ class EditorActivityV3 : AppCompatActivity() {
 
         // Insets padding (keeps bottom bar above keyboard)
         val spacer = findViewById<View>(R.id.statusBarSpacer)
+        val scenePanelContent = findViewById<View>(R.id.scenePanelContent)
+        val scenePanelBasePaddingTop = scenePanelContent?.paddingTop ?: 0
         ViewCompat.setOnApplyWindowInsetsListener(spacer) { v, ins ->
             val top = ins.getInsets(WindowInsetsCompat.Type.statusBars()).top
             v.layoutParams = v.layoutParams.apply { height = top }
+            // The scene panel spans full height
+            scenePanelContent?.setPadding(
+                scenePanelContent.paddingLeft, scenePanelBasePaddingTop + top,
+                scenePanelContent.paddingRight, scenePanelContent.paddingBottom
+            )
             ins
         }
         val container = findViewById<View>(R.id.editor_container)
@@ -611,6 +658,7 @@ class EditorActivityV3 : AppCompatActivity() {
         val tint = if (ColorUtils.calculateLuminance(chrome) >= 0.5) Color.BLACK else Color.WHITE
         currentUiTint = tint
 
+        findViewById<View>(R.id.root)?.setBackgroundColor(chrome)
         findViewById<View>(R.id.statusBarSpacer)?.setBackgroundColor(chrome)
         toolbar.setBackgroundColor(chrome)
         findViewById<View>(R.id.editor_container)?.setBackgroundColor(chrome)
@@ -622,6 +670,18 @@ class EditorActivityV3 : AppCompatActivity() {
         // Bottom bar icon tint
         listOf(btnUndo, btnRedo, btnIndent, btnOutdent, btnBold, btnItalic, btnFormat, btnZoomOut, btnZoomIn, btnSearch, btnSave).forEach { b ->
             b.setColorFilter(tint)
+        }
+        if (::btnPlay.isInitialized) btnPlay.setColorFilter(tint)
+
+        // Scene side menu: match the chrome/tint used elsewhere.
+        scenePanel?.setCardBackgroundColor(bar)
+        // Edge grab-handle: chrome-colored card with a tinted chevron.
+        sceneEdgeIndicator?.setCardBackgroundColor(bar)
+        (sceneEdgeIndicator?.getChildAt(0) as? ImageView)?.setColorFilter(tint)
+        findViewById<TextView>(R.id.scenePanelHeader)?.setTextColor(tint)
+        // Re-tint any scene rows already inflated.
+        sceneListContainer?.let { c ->
+            for (i in 0 until c.childCount) (c.getChildAt(i) as? TextView)?.setTextColor(tint)
         }
 
         // Find bar tint
@@ -766,6 +826,360 @@ class EditorActivityV3 : AppCompatActivity() {
         project.findFile("scenes")?.let { return it }
         project.findFile("mygame")?.findFile("scenes")?.let { return it }
         return project
+    }
+
+    // Scene side menu
+    // Cached list of .txt scene files
+    private var cachedSceneFiles: List<DocumentFile>? = null
+
+    private fun setScenePanelWidthPx(widthPx: Int) {
+        val panel = scenePanel ?: return
+        val w = widthPx.coerceIn(0, scenePanelWidthPx)
+        panel.layoutParams = panel.layoutParams.apply { width = w }
+        sceneScrim?.visibility = if (w > 0) View.VISIBLE else View.GONE
+        // Hide the edge hint while the panel is open so it doesn't sit on top of the list.
+        sceneEdgeIndicator?.visibility = if (w > 0) View.GONE else View.VISIBLE
+    }
+
+    private fun setScenePanelOpen(open: Boolean) {
+        // Refresh the file list only when the user actually opens the panel.
+        if (open) {
+            // Clear any editor text-selection popup and hide the keyboard so they don't overlap the panel.
+            editor.clearFocus()
+            hideKeyboard(editor)
+            refreshSceneFileCache()
+            renderSceneList()
+        }
+        setScenePanelWidthPx(if (open) scenePanelWidthPx else 0)
+        isScenePanelOpen = open
+        scenePanelBackCallback?.isEnabled = open
+    }
+
+    private fun toggleScenePanel() = setScenePanelOpen(!isScenePanelOpen)
+
+    private fun currentScenesDir(): DocumentFile? {
+        val projUri = projectTreeUri ?: return null
+        val project = DocumentFile.fromTreeUri(this, projUri) ?: return null
+        return resolveScenes(project)
+    }
+
+    // SAF I/O — call sparingly
+    private fun refreshSceneFileCache() {
+        val scenesDir = currentScenesDir()
+        val txt = scenesDir?.listFiles()
+            ?.filter { it.isFile && (it.name?.endsWith(".txt", ignoreCase = true) == true) }
+            ?.sortedBy { it.name?.lowercase() ?: "" }
+            ?: emptyList()
+        // Honor any user-defined order saved from either the editor or the project browser.
+        cachedSceneFiles = applySceneOrder(txt, loadSceneOrder())
+    }
+
+    // Order persistence — shares cside_prefs + the "order_files_<project>" key with the
+    // project browser, so a reorder in one surface shows up in the other.
+    private fun sceneOrderProjectName(): String? {
+        val projUri = projectTreeUri ?: return null
+        return DocumentFile.fromTreeUri(this, projUri)?.name
+    }
+
+    private fun loadSceneOrder(): List<String> {
+        val proj = sceneOrderProjectName() ?: return emptyList()
+        val raw = getSharedPreferences("cside_prefs", MODE_PRIVATE)
+            .getString("order_files_$proj", "") ?: ""
+        if (raw.isBlank()) return emptyList()
+        return raw.split("|").filter { it.isNotBlank() }
+    }
+
+    private fun saveSceneOrder(files: List<DocumentFile>) {
+        val proj = sceneOrderProjectName() ?: return
+        val joined = files.joinToString("|") { it.name ?: "" }
+        getSharedPreferences("cside_prefs", MODE_PRIVATE)
+            .edit { putString("order_files_$proj", joined) }
+    }
+
+    private fun applySceneOrder(raw: List<DocumentFile>, saved: List<String>): List<DocumentFile> {
+        if (saved.isEmpty()) return raw
+        val map = raw.associateBy { it.name ?: "" }
+        val ordered = saved.mapNotNull { map[it] }
+        val leftovers = raw.filter { (it.name ?: "") !in saved }
+        return ordered + leftovers
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun renderSceneList() {
+        val container = sceneListContainer ?: return
+        container.removeAllViews()
+
+        val files = cachedSceneFiles ?: emptyList()
+        val pad = (12 * resources.displayMetrics.density).toInt()
+        val padH = (20 * resources.displayMetrics.density).toInt()
+        val handleSize = (24 * resources.displayMetrics.density).toInt()
+        val activeName = currentDisplayName
+
+        for (file in files) {
+            val name = file.name ?: continue
+
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setPadding(padH, pad, padH, pad)
+                background = androidx.core.content.ContextCompat.getDrawable(
+                    this@EditorActivityV3, android.R.drawable.list_selector_background
+                )
+                // Identify this row by filename for reorder persistence.
+                tag = name
+            }
+
+            val handle = ImageView(this).apply {
+                setImageResource(R.drawable.ic_drag_handle_24)
+                val lp = LinearLayout.LayoutParams(handleSize, handleSize)
+                lp.marginEnd = (12 * resources.displayMetrics.density).toInt()
+                layoutParams = lp
+                setColorFilter(currentUiTint)
+                alpha = 0.6f
+                contentDescription = "Reorder"
+            }
+
+            val label = TextView(this).apply {
+                text = name
+                textSize = 15f
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                val isActive = !activeName.isNullOrBlank() && activeName.equals(name, ignoreCase = true)
+                setTextColor(currentUiTint)
+                alpha = if (isActive) 1.0f else 0.7f
+                setTypeface(typeface, if (isActive) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+                layoutParams = LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
+                )
+            }
+
+            row.addView(handle)
+            row.addView(label)
+
+            // Tap anywhere on the row opens the scene.
+            row.setOnClickListener { requestSwitchToScene(file) }
+
+            // Long-press anywhere on the row starts a drag.
+            row.setOnLongClickListener {
+                val data = android.content.ClipData.newPlainText("sceneRow", name)
+                val shadow = View.DragShadowBuilder(row)
+                @Suppress("DEPRECATION")
+                row.startDrag(data, shadow, row, 0)
+                true
+            }
+
+            // Touching the handle starts a drag immediately
+            handle.setOnTouchListener { _, event ->
+                if (event.actionMasked == android.view.MotionEvent.ACTION_DOWN) {
+                    val data = android.content.ClipData.newPlainText("sceneRow", name)
+                    val shadow = View.DragShadowBuilder(row)
+                    @Suppress("DEPRECATION")
+                    row.startDrag(data, shadow, row, 0)
+                    true
+                } else false
+            }
+
+            row.setOnDragListener(sceneRowDragListener)
+
+            container.addView(
+                row,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+        }
+    }
+
+    // Handles reordering as a dragged row hovers over its siblings, and persists on drop.
+    private val sceneRowDragListener = View.OnDragListener { view, event ->
+        val container = sceneListContainer ?: return@OnDragListener false
+        val dragged = event.localState as? View ?: return@OnDragListener false
+        when (event.action) {
+            android.view.DragEvent.ACTION_DRAG_STARTED -> {
+                if (view === dragged) dragged.alpha = 0.4f
+                true
+            }
+            android.view.DragEvent.ACTION_DRAG_ENTERED -> true
+            android.view.DragEvent.ACTION_DRAG_LOCATION -> {
+                val over = view
+                if (over !== dragged && over.parent === container) {
+                    val fromIdx = container.indexOfChild(dragged)
+                    val toIdx = container.indexOfChild(over)
+                    if (fromIdx != -1 && toIdx != -1) {
+                        container.removeView(dragged)
+                        container.addView(dragged, toIdx)
+                    }
+                }
+                true
+            }
+            android.view.DragEvent.ACTION_DROP -> true
+            android.view.DragEvent.ACTION_DRAG_ENDED -> {
+                dragged.alpha = 1.0f
+                dragged.visibility = View.VISIBLE
+                if (view === dragged) persistSceneOrderFromViews()
+                true
+            }
+            else -> true
+        }
+    }
+
+    private fun persistSceneOrderFromViews() {
+        val container = sceneListContainer ?: return
+        val byName = (cachedSceneFiles ?: emptyList()).associateBy { it.name ?: "" }
+        val ordered = ArrayList<DocumentFile>()
+        for (i in 0 until container.childCount) {
+            val tag = container.getChildAt(i).tag as? String ?: continue
+            byName[tag]?.let { ordered.add(it) }
+        }
+        if (ordered.isNotEmpty()) {
+            cachedSceneFiles = ordered
+            saveSceneOrder(ordered)
+        }
+    }
+
+    private fun requestSwitchToScene(file: DocumentFile) {
+        val name = file.name ?: return
+
+        // Tapping the file that's already open just closes the panel
+        val current = currentDisplayName
+        if (!current.isNullOrBlank() && current.equals(name, ignoreCase = true)) {
+            setScenePanelOpen(false)
+            return
+        }
+
+        // Auto-save the current file then switch
+        val oldUri = documentUri
+        uiScope.launch(Dispatchers.Main) {
+            if (oldUri != null) {
+                val text = editor.getTextContent()
+                runCatching {
+                    contentResolver.openOutputStream(oldUri, "rwt")?.use { os ->
+                        OutputStreamWriter(os).use { it.write(text) }
+                    }
+                }
+            }
+            switchToScene(file)
+        }
+    }
+
+    private fun switchToScene(file: DocumentFile) {
+        documentUri = file.uri
+        currentDisplayName = file.name
+        toolbar.title = currentDisplayName ?: ""
+        loadDocumentIntoEditor()
+        renderSceneList()
+        setScenePanelOpen(false)
+    }
+
+    // Play Button - launch the game in the runner webview
+
+    private fun playCurrentProject() {
+        val projUri = projectTreeUri
+        if (projUri == null) {
+            Toast.makeText(this, "No project to run", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val project = DocumentFile.fromTreeUri(this, projUri)
+        if (project == null) {
+            Toast.makeText(this, "No project to run", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Save the open file first so the game runs the latest text, then copy + launch
+        // The write is async; the copy must wait for it to finish
+        val uri = documentUri
+        uiScope.launch(Dispatchers.Main) {
+            if (uri != null) {
+                val text = editor.getTextContent()
+                runCatching {
+                    contentResolver.openOutputStream(uri, "rwt")?.use { os ->
+                        OutputStreamWriter(os).use { it.write(text) }
+                    }
+                }
+            }
+            val scenes = resolveScenes(project)
+            val ok = runCatching { copyProjectToRunner(project, scenes) }.isSuccess
+            if (ok) {
+                startActivity(Intent(this@EditorActivityV3, RunnerActivity::class.java))
+            } else {
+                Toast.makeText(this@EditorActivityV3, "Couldn't prepare the game", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    // Ported from ProjectsBrowserActivity so the editor launches the game identically.
+    private fun copyProjectToRunner(projectRoot: DocumentFile, srcScenes: DocumentFile) {
+        val destRoot = File(filesDir, "runner/mygame")
+        val destScenes = File(destRoot, "scenes")
+        val destImages = File(destRoot, "images")
+        destRoot.deleteRecursively()
+        destScenes.mkdirs()
+
+        for (doc in srcScenes.listFiles().orEmpty()) {
+            if (!doc.isFile) continue
+            val name = doc.name ?: continue
+            val outFile = File(destScenes, name)
+            contentResolver.openInputStream(doc.uri)?.use { input ->
+                FileOutputStream(outFile).use { output -> input.copyTo(output) }
+            }
+
+            if (isImageFile(name)) {
+                destImages.mkdirs()
+                val imgOut = File(destImages, name)
+                contentResolver.openInputStream(doc.uri)?.use { input ->
+                    FileOutputStream(imgOut).use { output -> input.copyTo(output) }
+                }
+            }
+        }
+
+        val imagesCandidates = listOfNotNull(
+            projectRoot.findFile("images"),
+            projectRoot.findFile("mygame")?.findFile("images")
+        )
+        val srcImages = imagesCandidates.firstOrNull { it.isDirectory }
+        if (srcImages != null) {
+            destImages.mkdirs()
+            for (doc in srcImages.listFiles().orEmpty()) {
+                if (!doc.isFile) continue
+                val name = doc.name ?: continue
+                val outFile = File(destImages, name)
+                contentResolver.openInputStream(doc.uri)?.use { input ->
+                    FileOutputStream(outFile).use { output -> input.copyTo(output) }
+                }
+            }
+        }
+
+        val mygameCandidates = listOfNotNull(
+            projectRoot.findFile("mygame.js"),
+            projectRoot.findFile("mygame")?.findFile("mygame.js")
+        )
+        for (doc in mygameCandidates) {
+            if (doc != null && doc.isFile) {
+                val outFile = File(destRoot, "mygame.js")
+                contentResolver.openInputStream(doc.uri)?.use { input ->
+                    FileOutputStream(outFile).use { output -> input.copyTo(output) }
+                }
+                break
+            }
+        }
+
+        val indexSrc = assets.open("choicescript/web/mygame/index.html")
+        val indexText = indexSrc.bufferedReader().readText()
+        val safeName = (projectRoot.name ?: "unnamed")
+            .replace("\"", "")
+            .replace("\\", "")
+        val patched = indexText.replace(
+            "window.storeName = null;",
+            "window.storeName = \"CS APP_${safeName}\";"
+        )
+        File(destRoot, "index.html").writeText(patched)
+    }
+
+    private fun isImageFile(name: String): Boolean {
+        val lower = name.lowercase()
+        return lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg") ||
+                lower.endsWith(".gif") || lower.endsWith(".webp")
     }
 
     private fun readText(df: DocumentFile): String {

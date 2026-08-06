@@ -45,275 +45,286 @@
 
         </LinearLayout>
 
-        <com.google.android.material.card.MaterialCardView
+        <ScrollView
+            android:id="@+id/settingsScroll"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            app:cardBackgroundColor="@color/pb_surface"
-            app:cardCornerRadius="@dimen/pb_card_corner_radius"
-            app:cardElevation="0dp"
-            app:strokeColor="@color/pb_border"
-            app:strokeWidth="1dp">
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:paddingBottom="24dp"
+            android:scrollbars="vertical">
 
-            <LinearLayout
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
+                android:layout_marginTop="20dp"
+                app:cardBackgroundColor="@color/pb_surface"
+                app:cardCornerRadius="@dimen/pb_card_corner_radius"
+                app:cardElevation="0dp"
+                app:strokeColor="@color/pb_border"
+                app:strokeWidth="1dp">
 
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="EDITOR"
-                    android:textSize="11sp"
-                    android:textStyle="bold"
-                    android:letterSpacing="0.08"
-                    android:textColor="@color/pb_text_secondary"
-                    android:paddingBottom="8dp" />
-
-                <!-- Visible Indents -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:paddingTop="8dp"
-                    android:paddingBottom="8dp">
+                    android:orientation="vertical"
+                    android:padding="16dp">
 
-                    <LinearLayout
-                        android:layout_width="0dp"
+                    <TextView
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
+                        android:text="EDITOR"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.08"
+                        android:textColor="@color/pb_text_secondary"
+                        android:paddingBottom="8dp" />
 
-                        <TextView
+                    <!-- Visible Indents -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:paddingTop="8dp"
+                        android:paddingBottom="8dp">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Visible Indents"
+                                android:textSize="16sp"
+                                android:textStyle="bold"
+                                android:textColor="@color/pb_text_primary" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Show indent markers (e.g. ---- for 4 spaces)"
+                                android:textSize="13sp"
+                                android:textColor="@color/pb_text_secondary"
+                                android:layout_marginTop="2dp" />
+
+                        </LinearLayout>
+
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchVisibleIndents"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Visible Indents"
-                            android:textSize="16sp"
-                            android:textStyle="bold"
-                            android:textColor="@color/pb_text_primary" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Show indent markers (e.g. ---- for 4 spaces)"
-                            android:textSize="13sp"
-                            android:textColor="@color/pb_text_secondary"
-                            android:layout_marginTop="2dp" />
+                            android:layout_marginStart="16dp"
+                            app:thumbTint="@color/pb_switch_thumb"
+                            app:trackTint="@color/pb_switch_track"
+                            android:checked="true" />
 
                     </LinearLayout>
 
-                    <com.google.android.material.switchmaterial.SwitchMaterial
-                        android:id="@+id/switchVisibleIndents"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="16dp"
-                        app:thumbTint="@color/pb_switch_thumb"
-                        app:trackTint="@color/pb_switch_track"
-                        android:checked="true" />
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="@color/pb_border" />
 
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/pb_border" />
-
-                <!-- Harper Spell Check -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:paddingTop="8dp"
-                    android:paddingBottom="8dp">
-
+                    <!-- Harper Spell Check -->
                     <LinearLayout
-                        android:layout_width="0dp"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:paddingTop="8dp"
+                        android:paddingBottom="8dp">
 
-                        <TextView
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Harper Spell Check"
+                                android:textSize="16sp"
+                                android:textStyle="bold"
+                                android:textColor="@color/pb_text_primary" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Underline errors while typing. Disable to only use your phone's default spell check."
+                                android:textSize="13sp"
+                                android:textColor="@color/pb_text_secondary"
+                                android:layout_marginTop="2dp" />
+
+                        </LinearLayout>
+
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchSpellCheck"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Harper Spell Check"
-                            android:textSize="16sp"
-                            android:textStyle="bold"
-                            android:textColor="@color/pb_text_primary" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Underline errors while typing. Disable to only use your phone's default spell check."
-                            android:textSize="13sp"
-                            android:textColor="@color/pb_text_secondary"
-                            android:layout_marginTop="2dp" />
+                            android:layout_marginStart="16dp"
+                            app:thumbTint="@color/pb_switch_thumb"
+                            app:trackTint="@color/pb_switch_track"
+                            android:checked="true" />
 
                     </LinearLayout>
 
-                    <com.google.android.material.switchmaterial.SwitchMaterial
-                        android:id="@+id/switchSpellCheck"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="16dp"
-                        app:thumbTint="@color/pb_switch_thumb"
-                        app:trackTint="@color/pb_switch_track"
-                        android:checked="true" />
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="@color/pb_border" />
 
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/pb_border" />
-
-                <!-- Reset Game on Launch -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:paddingTop="8dp"
-                    android:paddingBottom="8dp">
-
+                    <!-- Reset Game on Launch -->
                     <LinearLayout
-                        android:layout_width="0dp"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:paddingTop="8dp"
+                        android:paddingBottom="8dp">
 
-                        <TextView
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Reset Game/Webview on Launch"
+                                android:textSize="16sp"
+                                android:textStyle="bold"
+                                android:textColor="@color/pb_text_primary" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Clear saved game state each time you run the game. Useful for quick testing."
+                                android:textSize="13sp"
+                                android:textColor="@color/pb_text_secondary"
+                                android:layout_marginTop="2dp" />
+
+                        </LinearLayout>
+
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchResetOnLaunch"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Reset Game/Webview on Launch"
-                            android:textSize="16sp"
-                            android:textStyle="bold"
-                            android:textColor="@color/pb_text_primary" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Clear saved game state each time you run the game. Useful for quick testing."
-                            android:textSize="13sp"
-                            android:textColor="@color/pb_text_secondary"
-                            android:layout_marginTop="2dp" />
+                            android:layout_marginStart="16dp"
+                            app:thumbTint="@color/pb_switch_thumb"
+                            app:trackTint="@color/pb_switch_track"
+                            android:checked="true" />
 
                     </LinearLayout>
 
-                    <com.google.android.material.switchmaterial.SwitchMaterial
-                        android:id="@+id/switchResetOnLaunch"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="16dp"
-                        app:thumbTint="@color/pb_switch_thumb"
-                        app:trackTint="@color/pb_switch_track"
-                        android:checked="true" />
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="@color/pb_border" />
 
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/pb_border" />
-
-                <!-- Auto-Close Brackets -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:paddingTop="8dp"
-                    android:paddingBottom="8dp">
-
+                    <!-- Auto-Close Brackets -->
                     <LinearLayout
-                        android:layout_width="0dp"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:paddingTop="8dp"
+                        android:paddingBottom="8dp">
 
-                        <TextView
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Auto-Close Brackets"
+                                android:textSize="16sp"
+                                android:textStyle="bold"
+                                android:textColor="@color/pb_text_primary" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Automatically insert a matching closing bracket, quote, or parenthesis as you type."
+                                android:textSize="13sp"
+                                android:textColor="@color/pb_text_secondary"
+                                android:layout_marginTop="2dp" />
+
+                        </LinearLayout>
+
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchAutoCloseBrackets"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Auto-Close Brackets"
-                            android:textSize="16sp"
-                            android:textStyle="bold"
-                            android:textColor="@color/pb_text_primary" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Automatically insert a matching closing bracket, quote, or parenthesis as you type."
-                            android:textSize="13sp"
-                            android:textColor="@color/pb_text_secondary"
-                            android:layout_marginTop="2dp" />
+                            android:layout_marginStart="16dp"
+                            app:thumbTint="@color/pb_switch_thumb"
+                            app:trackTint="@color/pb_switch_track"
+                            android:checked="true" />
 
                     </LinearLayout>
 
-                    <com.google.android.material.switchmaterial.SwitchMaterial
-                        android:id="@+id/switchAutoCloseBrackets"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="16dp"
-                        app:thumbTint="@color/pb_switch_thumb"
-                        app:trackTint="@color/pb_switch_track"
-                        android:checked="true" />
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="@color/pb_border" />
 
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/pb_border" />
-
-                <!-- Use Tabs for Indentation -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:paddingTop="8dp"
-                    android:paddingBottom="8dp">
-
+                    <!-- Use Tabs for Indentation -->
                     <LinearLayout
-                        android:layout_width="0dp"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:paddingTop="8dp"
+                        android:paddingBottom="8dp">
 
-                        <TextView
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Use Tabs for Indentation"
+                                android:textSize="16sp"
+                                android:textStyle="bold"
+                                android:textColor="@color/pb_text_primary" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Indent with tabs instead of spaces. ChoiceScript needs one or the other throughout a project - set this to match your project before you start editing."
+                                android:textSize="13sp"
+                                android:textColor="@color/pb_text_secondary"
+                                android:layout_marginTop="2dp" />
+
+                        </LinearLayout>
+
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchUseTabs"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Use Tabs for Indentation"
-                            android:textSize="16sp"
-                            android:textStyle="bold"
-                            android:textColor="@color/pb_text_primary" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Indent with tabs instead of spaces. ChoiceScript needs one or the other throughout a project - set this to match your project before you start editing."
-                            android:textSize="13sp"
-                            android:textColor="@color/pb_text_secondary"
-                            android:layout_marginTop="2dp" />
+                            android:layout_marginStart="16dp"
+                            app:thumbTint="@color/pb_switch_thumb"
+                            app:trackTint="@color/pb_switch_track"
+                            android:checked="false" />
 
                     </LinearLayout>
 
-                    <com.google.android.material.switchmaterial.SwitchMaterial
-                        android:id="@+id/switchUseTabs"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="16dp"
-                        app:thumbTint="@color/pb_switch_thumb"
-                        app:trackTint="@color/pb_switch_track"
-                        android:checked="false" />
-
                 </LinearLayout>
 
-            </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
-        </com.google.android.material.card.MaterialCardView>
+        </ScrollView>
 
     </LinearLayout>
 
